@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Buscador de Viajes</title>
+</head>
+<body>
+
+  <h1>Buscador de Viajes</h1>
+
+  <input type="text" id="origen" placeholder="Origen (ej: SCL)">
+  <input type="text" id="destino" placeholder="Destino (ej: LIM)">
+  <button onclick="buscar()">Buscar</button>
+
+  <h2>Vuelos</h2>
+  <ul id="vuelos"></ul>
+
+  <h2>Hoteles</h2>
+  <ul id="hoteles"></ul>
+
+  <script>
+    async function buscar() {
+      const origen = document.getElementById("origen").value;
+      const destino = document.getElementById("destino").value;
+
+      const res = await fetch(`http://localhost:3000/buscar?origen=${origen}&destino=${destino}`);
+      const data = await res.json();
+
+      const vuelosList = document.getElementById("vuelos");
+      const hotelesList = document.getElementById("hoteles");
+
+      vuelosList.innerHTML = "";
+      hotelesList.innerHTML = "";
+
+      data.vuelos.forEach(v => {
+        const li = document.createElement("li");
+        li.textContent = `Precio: $${v.precio} - Duración: ${v.duracion}`;
+        vuelosList.appendChild(li);
+      });
+
+      data.hoteles.forEach(h => {
+        const li = document.createElement("li");
+        li.textContent = `${h.nombre} - $${h.precio} - ⭐ ${h.rating}`;
+        hotelesList.appendChild(li);
+      });
+    }
+  </script>
+
+</body>
+</html>

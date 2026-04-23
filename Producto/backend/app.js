@@ -1,5 +1,11 @@
 require("dotenv").config();
 
+const express = require("express");
+const cors = require("cors");
+
+const app = express();
+app.use(cors());
+
 const vuelos = [
   { precio: 120000, duracion: "3h" },
   { precio: 90000, duracion: "1h 30m" }
@@ -10,13 +16,21 @@ const hoteles = [
   { nombre: "Hotel Sur", precio: 40000, rating: 4.2 }
 ];
 
-function mejorVuelo() {
-  return vuelos.sort((a, b) => a.precio - b.precio)[0];
-}
+// Endpoint
+app.get("/buscar", (req, res) => {
+  const { origen, destino } = req.query;
 
-function mejorHotel() {
-  return hoteles.sort((a, b) => b.rating - a.rating)[0];
-}
+  if (!origen || !destino) {
+    return res.status(400).json({ error: "Faltan parámetros" });
+  }
 
-console.log("Mejor vuelo:", mejorVuelo());
-console.log("Mejor hotel:", mejorHotel());
+  res.json({
+    vuelos,
+    hoteles
+  });
+});
+
+// Servidor
+app.listen(3000, () => {
+  console.log("Servidor corriendo en http://localhost:3000");
+});
