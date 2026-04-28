@@ -24,71 +24,88 @@
     }
 
     header {
-      background: #2563eb;
+      background: linear-gradient(135deg, #2563eb, #1e40af);
       color: white;
-      padding: 30px;
+      padding: 40px;
       text-align: center;
     }
 
+    header h1 {
+      font-size: 40px;
+      margin-bottom: 10px;
+    }
+
     .container {
-      max-width: 1100px;
+      max-width: 1200px;
       margin: auto;
       padding: 30px;
     }
 
     .search-box {
       background: white;
-      padding: 20px;
-      border-radius: 15px;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
       margin-bottom: 30px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 15px;
     }
 
     input {
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
+      font-size: 15px;
     }
 
     button {
-      margin-top: 20px;
       width: 100%;
-      padding: 14px;
+      margin-top: 20px;
+      padding: 15px;
       border: none;
-      border-radius: 10px;
+      border-radius: 12px;
       background: #2563eb;
       color: white;
-      font-size: 16px;
+      font-size: 17px;
       cursor: pointer;
+      transition: 0.3s;
     }
 
     button:hover {
       background: #1d4ed8;
     }
 
+    h2 {
+      margin-top: 35px;
+      margin-bottom: 15px;
+      color: #2563eb;
+    }
+
     .cards {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 20px;
-      margin-top: 20px;
     }
 
     .card {
       background: white;
       padding: 20px;
-      border-radius: 15px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      border-radius: 18px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      transition: 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
     }
 
     .price {
       color: green;
-      font-size: 24px;
+      font-size: 28px;
       font-weight: bold;
       margin-top: 10px;
     }
@@ -96,11 +113,13 @@
     .rating {
       color: orange;
       margin-top: 10px;
+      font-size: 18px;
     }
 
-    h2 {
-      margin-top: 30px;
-      color: #2563eb;
+    .empty {
+      text-align: center;
+      padding: 30px;
+      color: #64748b;
     }
 
   </style>
@@ -113,7 +132,7 @@
 
     <h1>✈️ Travel Search</h1>
 
-    <p>Buscador de vuelos y hoteles</p>
+    <p>Buscador inteligente de vuelos y hoteles</p>
 
   </header>
 
@@ -138,26 +157,30 @@
         <input
           type="number"
           id="presupuesto"
-          placeholder="Presupuesto"
+          placeholder="Presupuesto total"
         >
 
       </div>
 
       <button onclick="buscar()">
-        Buscar
+        Buscar viaje
       </button>
 
     </div>
 
-    <h2>⭐ Recomendación</h2>
+    <h2>⭐ Recomendación según presupuesto</h2>
 
     <div class="cards" id="recomendacion"></div>
 
-    <h2>✈️ Vuelos</h2>
+    <h2>💸 Opción más económica</h2>
+
+    <div class="cards" id="economico"></div>
+
+    <h2>✈️ Vuelos disponibles</h2>
 
     <div class="cards" id="vuelos"></div>
 
-    <h2>🏨 Hoteles</h2>
+    <h2>🏨 Hoteles disponibles</h2>
 
     <div class="cards" id="hoteles"></div>
 
@@ -167,106 +190,377 @@
 
     async function buscar() {
 
-      const origen = document.getElementById("origen").value;
+      const origen = document.getElementById("origen").value.trim();
 
-      const destino = document.getElementById("destino").value;
+      const destino = document.getElementById("destino").value.trim();
 
-      const presupuesto = document.getElementById("presupuesto").value;
-
-      const response = await fetch(
-
-        `http://localhost:3000/buscar?origen=${origen}&destino=${destino}&presupuesto=${presupuesto}`
-
+      const presupuesto = Number(
+        document.getElementById("presupuesto").value
       );
 
-      const data = await response.json();
-
       const vuelosDiv = document.getElementById("vuelos");
+
       const hotelesDiv = document.getElementById("hoteles");
-      const recomendacionDiv = document.getElementById("recomendacion");
+
+      const recomendacionDiv =
+        document.getElementById("recomendacion");
+
+      const economicoDiv =
+        document.getElementById("economico");
 
       vuelosDiv.innerHTML = "";
+
       hotelesDiv.innerHTML = "";
+
       recomendacionDiv.innerHTML = "";
 
-      // RECOMENDACION
+      economicoDiv.innerHTML = "";
 
-      if (data.recomendacion.vuelo) {
+      // VALIDACION
+
+      if (!origen || !destino) {
 
         recomendacionDiv.innerHTML = `
 
-          <div class="card">
+          <div class="card empty">
 
-            <h3>Mejor vuelo</h3>
-
-            <p>${data.recomendacion.vuelo.aerolinea}</p>
-
-            <div class="price">
-              $${data.recomendacion.vuelo.precio}
-            </div>
-
-            <br>
-
-            <h3>Mejor hotel</h3>
-
-            <p>${data.recomendacion.hotel.nombre}</p>
-
-            <div class="rating">
-              ⭐ ${data.recomendacion.hotel.rating}
-            </div>
-
-            <br>
-
-            <h3>
-              Total:
-              $${data.recomendacion.total}
-            </h3>
+            Debe ingresar origen y destino
 
           </div>
+
         `;
+
+        return;
       }
 
-      // VUELOS
+      try {
 
-      data.vuelos.forEach(v => {
+        const response = await fetch(
 
-        vuelosDiv.innerHTML += `
+          `http://localhost:3000/buscar?origen=${origen}&destino=${destino}`
 
-          <div class="card">
+        );
 
-            <h3>${v.aerolinea}</h3>
+        const data = await response.json();
 
-            <div class="price">
-              $${v.precio}
+        const vuelos = data.vuelos || [];
+
+        const hoteles = data.hoteles || [];
+
+        // =====================================
+        // RECOMENDACION PRESUPUESTO
+        // =====================================
+
+        let mejorVuelo = null;
+
+        let mejorHotel = null;
+
+        let mejorTotal = -1;
+
+        // =====================================
+        // MAS ECONOMICO
+        // =====================================
+
+        let vueloEconomico = null;
+
+        let hotelEconomico = null;
+
+        let totalEconomico = Infinity;
+
+        for (const vuelo of vuelos) {
+
+          for (const hotel of hoteles) {
+
+            const total =
+              vuelo.precio + hotel.precio;
+
+            // ECONOMICO
+
+            if (total < totalEconomico) {
+
+              totalEconomico = total;
+
+              vueloEconomico = vuelo;
+
+              hotelEconomico = hotel;
+
+            }
+
+            // PRESUPUESTO
+
+            if (presupuesto > 0) {
+
+              if (
+                total <= presupuesto &&
+                total > mejorTotal
+              ) {
+
+                mejorTotal = total;
+
+                mejorVuelo = vuelo;
+
+                mejorHotel = hotel;
+
+              }
+
+            }
+
+          }
+
+        }
+
+        // SI NO ENCUENTRA DENTRO DEL PRESUPUESTO
+        // USA EL MAS ECONOMICO
+
+        if (!mejorVuelo || !mejorHotel) {
+
+          mejorVuelo = vueloEconomico;
+
+          mejorHotel = hotelEconomico;
+
+          mejorTotal = totalEconomico;
+
+        }
+
+        // =====================================
+        // MOSTRAR RECOMENDACION
+        // =====================================
+
+        if (mejorVuelo && mejorHotel) {
+
+          recomendacionDiv.innerHTML = `
+
+            <div class="card">
+
+              <h3>✈️ Vuelo recomendado</h3>
+
+              <br>
+
+              <p>
+                ${mejorVuelo.aerolinea}
+              </p>
+
+              <p>
+                ${mejorVuelo.origen}
+                →
+                ${mejorVuelo.destino}
+              </p>
+
+              <p>
+                ⏱ ${mejorVuelo.duracion}
+              </p>
+
+              <div class="price">
+                $${mejorVuelo.precio}
+              </div>
+
+              <br>
+
+              <h3>🏨 Hotel recomendado</h3>
+
+              <br>
+
+              <p>
+                ${mejorHotel.nombre}
+              </p>
+
+              <div class="rating">
+                ⭐ ${mejorHotel.rating}
+              </div>
+
+              <div class="price">
+                $${mejorHotel.precio}
+              </div>
+
+              <br>
+
+              <h2>
+                💰 Total:
+                $${mejorTotal}
+              </h2>
+
             </div>
 
-            <p>${v.duracion}</p>
+          `;
+
+        } else {
+
+          recomendacionDiv.innerHTML = `
+
+            <div class="card empty">
+
+              No hay recomendaciones disponibles
+
+            </div>
+
+          `;
+        }
+
+        // =====================================
+        // MOSTRAR ECONOMICO
+        // =====================================
+
+        if (vueloEconomico && hotelEconomico) {
+
+          economicoDiv.innerHTML = `
+
+            <div class="card">
+
+              <h3>💸 Viaje más económico</h3>
+
+              <br>
+
+              <p>
+                ✈️ ${vueloEconomico.aerolinea}
+              </p>
+
+              <p>
+                ${vueloEconomico.origen}
+                →
+                ${vueloEconomico.destino}
+              </p>
+
+              <div class="price">
+                $${vueloEconomico.precio}
+              </div>
+
+              <br>
+
+              <p>
+                🏨 ${hotelEconomico.nombre}
+              </p>
+
+              <div class="rating">
+                ⭐ ${hotelEconomico.rating}
+              </div>
+
+              <div class="price">
+                $${hotelEconomico.precio}
+              </div>
+
+              <br>
+
+              <h2>
+                💰 Total:
+                $${totalEconomico}
+              </h2>
+
+            </div>
+
+          `;
+        }
+
+        // =====================================
+        // VUELOS
+        // =====================================
+
+        if (vuelos.length === 0) {
+
+          vuelosDiv.innerHTML = `
+
+            <div class="card empty">
+
+              No se encontraron vuelos
+
+            </div>
+
+          `;
+
+        } else {
+
+          vuelos.forEach(v => {
+
+            vuelosDiv.innerHTML += `
+
+              <div class="card">
+
+                <h3>${v.aerolinea}</h3>
+
+                <br>
+
+                <p>
+                  ${v.origen}
+                  →
+                  ${v.destino}
+                </p>
+
+                <p>
+                  ⏱ ${v.duracion}
+                </p>
+
+                <div class="price">
+                  $${v.precio}
+                </div>
+
+              </div>
+
+            `;
+          });
+
+        }
+
+        // =====================================
+        // HOTELES
+        // =====================================
+
+        if (hoteles.length === 0) {
+
+          hotelesDiv.innerHTML = `
+
+            <div class="card empty">
+
+              No se encontraron hoteles
+
+            </div>
+
+          `;
+
+        } else {
+
+          hoteles.forEach(h => {
+
+            hotelesDiv.innerHTML += `
+
+              <div class="card">
+
+                <h3>${h.nombre}</h3>
+
+                <br>
+
+                <p>
+                  📍 ${h.ciudad}
+                </p>
+
+                <div class="rating">
+                  ⭐ ${h.rating}
+                </div>
+
+                <div class="price">
+                  $${h.precio}
+                </div>
+
+              </div>
+
+            `;
+          });
+
+        }
+
+      } catch (error) {
+
+        recomendacionDiv.innerHTML = `
+
+          <div class="card empty">
+
+            Error al conectar con el servidor
 
           </div>
+
         `;
-      });
 
-      // HOTELES
+        console.error(error);
 
-      data.hoteles.forEach(h => {
-
-        hotelesDiv.innerHTML += `
-
-          <div class="card">
-
-            <h3>${h.nombre}</h3>
-
-            <div class="price">
-              $${h.precio}
-            </div>
-
-            <div class="rating">
-              ⭐ ${h.rating}
-            </div>
-
-          </div>
-        `;
-      });
+      }
 
     }
 
