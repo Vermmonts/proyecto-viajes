@@ -1,46 +1,22 @@
-const axios = require("axios");
+const db = require("../db");
 
 async function buscarVuelos(origen, destino) {
 
-  if (process.env.USE_API !== "true") {
-    return [
-      {
-        tipo: "vuelo",
-        precio: 120000,
-        duracion: "3h",
-        aerolinea: "LATAM"
-      },
-      {
-        tipo: "vuelo",
-        precio: 90000,
-        duracion: "1h 30m",
-        aerolinea: "Sky"
-      }
-    ];
-  }
+  const [rows] = await db.execute(
 
-  try {
-    const response = await axios.get("https://api.ejemplo.com/vuelos", {
-      params: {
-        from: origen,
-        to: destino
-      },
-      headers: {
-        Authorization: `Bearer ${process.env.API_VUELOS}`
-      }
-    });
+    `
+      SELECT *
+      FROM vuelos
+      WHERE origen = ?
+      AND destino = ?
+      ORDER BY precio ASC
+    `,
 
-    return response.data.map(v => ({
-      tipo: "vuelo",
-      precio: v.price || 0,
-      duracion: v.duration || "N/A",
-      aerolinea: v.airline || "Desconocida"
-    }));
+    [origen, destino]
 
-  } catch (error) {
-    console.error("❌ Error API vuelos:", error.message);
-    return [];
-  }
+  );
+
+  return rows;
 }
 
 module.exports = buscarVuelos;

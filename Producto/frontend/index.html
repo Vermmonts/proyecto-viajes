@@ -1,50 +1,277 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
+
   <meta charset="UTF-8">
-  <title>Buscador de Viajes</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Travel Search</title>
+
+  <style>
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: #f1f5f9;
+      color: #1e293b;
+    }
+
+    header {
+      background: #2563eb;
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+      padding: 30px;
+    }
+
+    .search-box {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 30px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    input {
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .price {
+      color: green;
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .rating {
+      color: orange;
+      margin-top: 10px;
+    }
+
+    h2 {
+      margin-top: 30px;
+      color: #2563eb;
+    }
+
+  </style>
+
 </head>
+
 <body>
 
-  <h1>Buscador de Viajes</h1>
+  <header>
 
-  <input type="text" id="origen" placeholder="Origen (ej: SCL)">
-  <input type="text" id="destino" placeholder="Destino (ej: LIM)">
-  <button onclick="buscar()">Buscar</button>
+    <h1>✈️ Travel Search</h1>
 
-  <h2>Vuelos</h2>
-  <ul id="vuelos"></ul>
+    <p>Buscador de vuelos y hoteles</p>
 
-  <h2>Hoteles</h2>
-  <ul id="hoteles"></ul>
+  </header>
+
+  <div class="container">
+
+    <div class="search-box">
+
+      <div class="grid">
+
+        <input
+          type="text"
+          id="origen"
+          placeholder="Origen"
+        >
+
+        <input
+          type="text"
+          id="destino"
+          placeholder="Destino"
+        >
+
+        <input
+          type="number"
+          id="presupuesto"
+          placeholder="Presupuesto"
+        >
+
+      </div>
+
+      <button onclick="buscar()">
+        Buscar
+      </button>
+
+    </div>
+
+    <h2>⭐ Recomendación</h2>
+
+    <div class="cards" id="recomendacion"></div>
+
+    <h2>✈️ Vuelos</h2>
+
+    <div class="cards" id="vuelos"></div>
+
+    <h2>🏨 Hoteles</h2>
+
+    <div class="cards" id="hoteles"></div>
+
+  </div>
 
   <script>
+
     async function buscar() {
+
       const origen = document.getElementById("origen").value;
+
       const destino = document.getElementById("destino").value;
 
-      const res = await fetch(`http://localhost:3000/buscar?origen=${origen}&destino=${destino}`);
-      const data = await res.json();
+      const presupuesto = document.getElementById("presupuesto").value;
 
-      const vuelosList = document.getElementById("vuelos");
-      const hotelesList = document.getElementById("hoteles");
+      const response = await fetch(
 
-      vuelosList.innerHTML = "";
-      hotelesList.innerHTML = "";
+        `http://localhost:3000/buscar?origen=${origen}&destino=${destino}&presupuesto=${presupuesto}`
+
+      );
+
+      const data = await response.json();
+
+      const vuelosDiv = document.getElementById("vuelos");
+      const hotelesDiv = document.getElementById("hoteles");
+      const recomendacionDiv = document.getElementById("recomendacion");
+
+      vuelosDiv.innerHTML = "";
+      hotelesDiv.innerHTML = "";
+      recomendacionDiv.innerHTML = "";
+
+      // RECOMENDACION
+
+      if (data.recomendacion.vuelo) {
+
+        recomendacionDiv.innerHTML = `
+
+          <div class="card">
+
+            <h3>Mejor vuelo</h3>
+
+            <p>${data.recomendacion.vuelo.aerolinea}</p>
+
+            <div class="price">
+              $${data.recomendacion.vuelo.precio}
+            </div>
+
+            <br>
+
+            <h3>Mejor hotel</h3>
+
+            <p>${data.recomendacion.hotel.nombre}</p>
+
+            <div class="rating">
+              ⭐ ${data.recomendacion.hotel.rating}
+            </div>
+
+            <br>
+
+            <h3>
+              Total:
+              $${data.recomendacion.total}
+            </h3>
+
+          </div>
+        `;
+      }
+
+      // VUELOS
 
       data.vuelos.forEach(v => {
-        const li = document.createElement("li");
-        li.textContent = `Precio: $${v.precio} - Duración: ${v.duracion}`;
-        vuelosList.appendChild(li);
+
+        vuelosDiv.innerHTML += `
+
+          <div class="card">
+
+            <h3>${v.aerolinea}</h3>
+
+            <div class="price">
+              $${v.precio}
+            </div>
+
+            <p>${v.duracion}</p>
+
+          </div>
+        `;
       });
 
+      // HOTELES
+
       data.hoteles.forEach(h => {
-        const li = document.createElement("li");
-        li.textContent = `${h.nombre} - $${h.precio} - ⭐ ${h.rating}`;
-        hotelesList.appendChild(li);
+
+        hotelesDiv.innerHTML += `
+
+          <div class="card">
+
+            <h3>${h.nombre}</h3>
+
+            <div class="price">
+              $${h.precio}
+            </div>
+
+            <div class="rating">
+              ⭐ ${h.rating}
+            </div>
+
+          </div>
+        `;
       });
+
     }
+
   </script>
 
 </body>
+
 </html>
