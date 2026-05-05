@@ -1,19 +1,18 @@
 const db = require("../db");
 
-async function buscarHoteles(ciudad) {
+async function buscarHoteles(destino, fechaIda, fechaVuelta) {
 
-  const [rows] = await db.execute(
+  let query = "SELECT * FROM hoteles WHERE 1=1";
+  const params = [];
 
-    `
-      SELECT *
-      FROM hoteles
-      WHERE ciudad = ?
-      ORDER BY rating DESC
-    `,
+  if (destino) {
+    query += " AND LOWER(ciudad) LIKE LOWER(?)";
+    params.push(`%${destino}%`);
+  }
 
-    [ciudad]
+  const [rows] = await db.query(query, params);
 
-  );
+  console.log("🏨 Hoteles encontrados:", rows.length);
 
   return rows;
 }

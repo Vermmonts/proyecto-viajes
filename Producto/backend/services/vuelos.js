@@ -1,20 +1,28 @@
 const db = require("../db");
 
-async function buscarVuelos(origen, destino) {
+async function buscarVuelos(origen, destino, fecha) {
 
-  const [rows] = await db.execute(
+  let query = "SELECT * FROM vuelos WHERE 1=1";
+  const params = [];
 
-    `
-      SELECT *
-      FROM vuelos
-      WHERE origen = ?
-      AND destino = ?
-      ORDER BY precio ASC
-    `,
+  if (origen) {
+    query += " AND LOWER(origen) LIKE LOWER(?)";
+    params.push(`%${origen}%`);
+  }
 
-    [origen, destino]
+  if (destino) {
+    query += " AND LOWER(destino) LIKE LOWER(?)";
+    params.push(`%${destino}%`);
+  }
 
-  );
+  if (fecha) {
+    query += " AND fecha = ?";
+    params.push(fecha);
+  }
+
+  const [rows] = await db.query(query, params);
+
+  console.log("✈️ Vuelos encontrados:", rows.length);
 
   return rows;
 }
