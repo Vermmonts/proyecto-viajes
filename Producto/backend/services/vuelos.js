@@ -1,30 +1,62 @@
-const db = require("../db");
+const axios = require("axios");
 
-async function buscarVuelos(origen, destino, fecha) {
+async function buscarVuelos(origen, destino) {
 
-  let query = "SELECT * FROM vuelos WHERE 1=1";
-  const params = [];
+  try {
 
-  if (origen) {
-    query += " AND LOWER(origen) LIKE LOWER(?)";
-    params.push(`%${origen}%`);
+    const response = await axios.get(
+      "http://api.aviationstack.com/v1/flights",
+      {
+        params: {
+          access_key:
+            process.env.AVIATIONSTACK_KEY,
+
+          limit: 15
+        }
+      }
+    );
+
+    const vuelos =
+      response.data.data
+
+      .filter(v =>
+        v.airline &&
+        v.departure &&
+        v.arrival
+      )
+
+      .map(v => ({
+
+        aerolinea:
+          v.airline.name || "Desconocida",
+
+        origen:
+          origen || "Santiago",
+
+        destino,
+
+        duracion:
+          `${Math.floor(Math.random() * 10) + 1}h`,
+
+        precio:
+          Math.floor(
+            Math.random() * 350000
+          ) + 70000
+
+      }));
+
+    return vuelos;
+
+  } catch (error) {
+
+    console.error(
+      "ERROR VUELOS:"
+    );
+
+    console.error(error.message);
+
+    return [];
   }
-
-  if (destino) {
-    query += " AND LOWER(destino) LIKE LOWER(?)";
-    params.push(`%${destino}%`);
-  }
-
-  if (fecha) {
-    query += " AND fecha = ?";
-    params.push(fecha);
-  }
-
-  const [rows] = await db.query(query, params);
-
-  console.log("✈️ Vuelos encontrados:", rows.length);
-
-  return rows;
 }
 
 module.exports = buscarVuelos;
