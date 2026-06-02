@@ -1,204 +1,27 @@
-USE proyecto_viajes;
+USE viajes_app;
 
--- =====================================
--- LIMPIAR TABLAS
--- =====================================
+INSERT INTO vuelos (aerolinea, origen, destino, codigo_origen, codigo_destino, fecha_salida, hora_salida, fecha_regreso, hora_regreso, precio, escalas, puntuacion) VALUES
+('LATAM Airlines', 'Santiago', 'Buenos Aires', 'SCL', 'EZE', '2026-07-10', '08:15:00', '2026-07-17', '19:30:00', 145000, 0, 4.7),
+('Sky Airline', 'Santiago', 'Buenos Aires', 'SCL', 'EZE', '2026-07-10', '11:40:00', '2026-07-17', '21:15:00', 118000, 0, 4.3),
+('JetSMART', 'Santiago', 'Buenos Aires', 'SCL', 'AEP', '2026-07-10', '06:50:00', '2026-07-17', '22:05:00', 99000, 0, 4.0),
+('LATAM Airlines', 'Santiago', 'Rio de Janeiro', 'SCL', 'GIG', '2026-07-10', '09:20:00', '2026-07-17', '18:10:00', 239000, 0, 4.8),
+('Sky Airline', 'Santiago', 'Rio de Janeiro', 'SCL', 'GIG', '2026-07-10', '13:10:00', '2026-07-17', '20:40:00', 198000, 1, 4.2),
+('Copa Airlines', 'Santiago', 'Cancún', 'SCL', 'CUN', '2026-07-10', '04:35:00', '2026-07-17', '17:25:00', 420000, 1, 4.5),
+('Avianca', 'Santiago', 'Bogotá', 'SCL', 'BOG', '2026-07-10', '07:00:00', '2026-07-17', '16:10:00', 255000, 0, 4.4),
+('LATAM Airlines', 'Santiago', 'Lima', 'SCL', 'LIM', '2026-07-10', '10:00:00', '2026-07-17', '15:20:00', 175000, 0, 4.6),
+('Iberia', 'Santiago', 'Madrid', 'SCL', 'MAD', '2026-07-10', '12:10:00', '2026-07-17', '23:50:00', 720000, 0, 4.7),
+('LATAM Airlines', 'Santiago', 'Buenos Aires', 'SCL', 'EZE', '2026-08-05', '08:15:00', '2026-08-12', '19:30:00', 132000, 0, 4.7),
+('Sky Airline', 'Santiago', 'Rio de Janeiro', 'SCL', 'GIG', '2026-08-05', '13:10:00', '2026-08-12', '20:40:00', 210000, 1, 4.2),
+('LATAM Airlines', 'Santiago', 'Lima', 'SCL', 'LIM', '2026-08-05', '10:00:00', '2026-08-12', '15:20:00', 160000, 0, 4.6);
 
-DELETE FROM vuelos;
-DELETE FROM hoteles;
-
--- =====================================
--- DATOS VUELOS CHILE
--- =====================================
-
-INSERT INTO vuelos (
-  origen,
-  destino,
-  aerolinea,
-  precio,
-  duracion
-)
-VALUES
-
-('Santiago', 'Antofagasta', 'LATAM', 85000, '2h'),
-('Santiago', 'Antofagasta', 'Sky', 70000, '2h 10m'),
-('Santiago', 'Antofagasta', 'JetSmart', 65000, '2h'),
-
-('Santiago', 'Concepción', 'LATAM', 50000, '1h'),
-('Santiago', 'Concepción', 'Sky', 45000, '1h 5m'),
-
-('Santiago', 'Puerto Montt', 'LATAM', 95000, '2h 15m'),
-('Santiago', 'Puerto Montt', 'Sky', 85000, '2h 20m'),
-
-('Santiago', 'Temuco', 'JetSmart', 55000, '1h 30m'),
-('Santiago', 'Temuco', 'LATAM', 65000, '1h 25m'),
-
-('Santiago', 'Punta Arenas', 'LATAM', 110000, '3h'),
-('Santiago', 'Punta Arenas', 'Sky', 95000, '3h 15m'),
-
-('Santiago', 'Iquique', 'JetSmart', 70000, '2h 20m'),
-('Santiago', 'Iquique', 'LATAM', 80000, '2h'),
-
-('Santiago', 'La Serena', 'LATAM', 60000, '1h 20m'),
-
-('Santiago', 'Arica', 'Sky', 95000, '3h'),
-('Santiago', 'Arica', 'LATAM', 110000, '3h 10m');
-
--- =====================================
--- DATOS VUELOS LATINOAMERICA
--- =====================================
-
-INSERT INTO vuelos (
-  origen,
-  destino,
-  aerolinea,
-  precio,
-  duracion
-)
-VALUES
-
-('Santiago', 'Lima', 'LATAM', 120000, '3h'),
-('Santiago', 'Lima', 'Sky', 95000, '2h 45m'),
-('Santiago', 'Lima', 'JetSmart', 85000, '3h'),
-
-('Santiago', 'Buenos Aires', 'LATAM', 140000, '2h'),
-('Santiago', 'Buenos Aires', 'Sky', 125000, '2h 10m'),
-
-('Santiago', 'Río de Janeiro', 'LATAM', 250000, '4h'),
-('Santiago', 'Río de Janeiro', 'Sky', 220000, '4h 10m'),
-
-('Santiago', 'São Paulo', 'LATAM', 280000, '4h 30m'),
-
-('Santiago', 'Bogotá', 'Avianca', 320000, '6h'),
-
-('Santiago', 'Ciudad de México', 'Aeromexico', 450000, '8h'),
-
-('Santiago', 'Quito', 'LATAM', 350000, '6h'),
-
-('Santiago', 'Cancún', 'Copa Airlines', 520000, '9h');
-
--- =====================================
--- DATOS VUELOS USA Y EUROPA
--- =====================================
-
-INSERT INTO vuelos (
-  origen,
-  destino,
-  aerolinea,
-  precio,
-  duracion
-)
-VALUES
-
-('Santiago', 'Miami', 'American Airlines', 450000, '8h'),
-('Santiago', 'Miami', 'LATAM', 430000, '8h 15m'),
-
-('Santiago', 'Nueva York', 'Delta', 680000, '10h'),
-
-('Santiago', 'Los Ángeles', 'LATAM', 750000, '11h'),
-
-('Santiago', 'Madrid', 'Iberia', 780000, '12h'),
-('Santiago', 'Madrid', 'LATAM', 820000, '12h 20m'),
-
-('Santiago', 'Barcelona', 'Iberia', 850000, '13h'),
-
-('Santiago', 'París', 'Air France', 980000, '14h'),
-
-('Santiago', 'Roma', 'ITA Airways', 1050000, '15h'),
-
-('Santiago', 'Londres', 'British Airways', 1150000, '16h');
-
--- =====================================
--- HOTELES CHILE
--- =====================================
-
-INSERT INTO hoteles (
-  nombre,
-  ciudad,
-  precio,
-  rating
-)
-VALUES
-
-('Hotel Santiago Centro', 'Santiago', 65000, 4.5),
-('Hotel Plaza Santiago', 'Santiago', 85000, 4.8),
-('Hostal Providencia', 'Santiago', 30000, 4.1),
-
-('Hotel Antofagasta', 'Antofagasta', 70000, 4.4),
-('Hotel Desierto Norte', 'Antofagasta', 55000, 4.0),
-
-('Hotel Concepción', 'Concepción', 60000, 4.3),
-
-('Hotel Puerto Montt', 'Puerto Montt', 75000, 4.5),
-
-('Hotel Patagonia', 'Punta Arenas', 85000, 4.7),
-('Hostal Austral', 'Punta Arenas', 40000, 4.0),
-
-('Hotel Iquique Beach', 'Iquique', 72000, 4.6),
-
-('Hotel La Serena', 'La Serena', 68000, 4.4),
-
-('Hotel Arica Sol', 'Arica', 60000, 4.2),
-
-('Hotel Temuco Plaza', 'Temuco', 58000, 4.1);
-
--- =====================================
--- HOTELES LATINOAMERICA
--- =====================================
-
-INSERT INTO hoteles (
-  nombre,
-  ciudad,
-  precio,
-  rating
-)
-VALUES
-
-('Hotel Central Lima', 'Lima', 50000, 4.5),
-('Hotel Premium Lima', 'Lima', 70000, 4.8),
-('Hostal Lima Económico', 'Lima', 25000, 3.9),
-
-('Hotel Buenos Aires', 'Buenos Aires', 65000, 4.7),
-('Hotel Obelisco', 'Buenos Aires', 55000, 4.3),
-
-('Rio Beach Hotel', 'Río de Janeiro', 95000, 4.8),
-
-('Sao Paulo Business Hotel', 'São Paulo', 90000, 4.5),
-
-('Bogotá Suites', 'Bogotá', 70000, 4.2),
-
-('Hotel Cancún Resort', 'Cancún', 160000, 4.9),
-
-('Mexico City Hotel', 'Ciudad de México', 85000, 4.4),
-
-('Quito Andes Hotel', 'Quito', 60000, 4.1);
-
--- =====================================
--- HOTELES USA Y EUROPA
--- =====================================
-
-INSERT INTO hoteles (
-  nombre,
-  ciudad,
-  precio,
-  rating
-)
-VALUES
-
-('Miami Beach Hotel', 'Miami', 120000, 4.9),
-('Ocean Miami Resort', 'Miami', 150000, 4.8),
-
-('New York Central Hotel', 'Nueva York', 220000, 4.7),
-
-('Los Angeles Sunset Hotel', 'Los Ángeles', 180000, 4.5),
-
-('Hotel Madrid Centro', 'Madrid', 85000, 4.8),
-('Hotel Sol Madrid', 'Madrid', 70000, 4.3),
-
-('Barcelona Sea Hotel', 'Barcelona', 98000, 4.6),
-
-('Paris Luxury Hotel', 'París', 250000, 4.9),
-
-('Roma Imperial Hotel', 'Roma', 180000, 4.7),
-
-('London Bridge Hotel', 'Londres', 260000, 4.8);
+INSERT INTO hoteles (nombre, ciudad, direccion, estrellas, puntuacion, precio_noche, imagen) VALUES
+('Hotel Madero Buenos Aires', 'Buenos Aires', 'Puerto Madero', 5, 4.8, 92000, 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=900&q=80'),
+('NH Buenos Aires City', 'Buenos Aires', 'Centro Histórico', 4, 4.5, 68000, 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=900&q=80'),
+('Ibis Buenos Aires Obelisco', 'Buenos Aires', 'Av. Corrientes', 3, 4.1, 42000, 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=900&q=80'),
+('Hilton Copacabana Rio', 'Rio de Janeiro', 'Copacabana', 5, 4.9, 118000, 'https://images.unsplash.com/photo-1540541338287-41700207dee6?auto=format&fit=crop&w=900&q=80'),
+('Windsor Plaza Copacabana', 'Rio de Janeiro', 'Copacabana', 4, 4.6, 79000, 'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&w=900&q=80'),
+('Ibis Rio de Janeiro Centro', 'Rio de Janeiro', 'Centro', 3, 4.0, 46000, 'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=900&q=80'),
+('Grand Fiesta Americana Coral Beach', 'Cancún', 'Zona Hotelera', 5, 4.8, 180000, 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=900&q=80'),
+('Hotel Estelar Parque 93', 'Bogotá', 'Parque 93', 4, 4.6, 72000, 'https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=900&q=80'),
+('Costa del Sol Wyndham Lima', 'Lima', 'Miraflores', 4, 4.5, 70000, 'https://images.unsplash.com/photo-1578683010236-d716f9a3f461?auto=format&fit=crop&w=900&q=80'),
+('Hotel Riu Plaza España', 'Madrid', 'Gran Vía', 4, 4.7, 130000, 'https://images.unsplash.com/photo-1596394516093-501ba68a0ba6?auto=format&fit=crop&w=900&q=80');

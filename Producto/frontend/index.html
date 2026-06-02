@@ -1,656 +1,131 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-
-  <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <title>Travel Search PRO</title>
-
-  <style>
-
-    *{
-      margin:0;
-      padding:0;
-      box-sizing:border-box;
-      font-family:Arial, sans-serif;
-    }
-
-    body{
-      background:#f1f5f9;
-      color:#1e293b;
-    }
-
-    header{
-      background:linear-gradient(135deg,#2563eb,#1e40af);
-      color:white;
-      padding:40px;
-      text-align:center;
-    }
-
-    header h1{
-      font-size:42px;
-      margin-bottom:10px;
-    }
-
-    header p{
-      opacity:0.9;
-    }
-
-    .container{
-      max-width:1200px;
-      margin:auto;
-      padding:30px;
-    }
-
-    .search-box{
-      background:white;
-      padding:25px;
-      border-radius:18px;
-      box-shadow:0 4px 15px rgba(0,0,0,0.1);
-      margin-bottom:25px;
-    }
-
-    .grid{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-      gap:15px;
-    }
-
-    input,
-    select{
-      padding:14px;
-      border-radius:12px;
-      border:1px solid #cbd5e1;
-      font-size:15px;
-      width:100%;
-    }
-
-    button{
-      margin-top:20px;
-      width:100%;
-      padding:15px;
-      border:none;
-      border-radius:12px;
-      background:#2563eb;
-      color:white;
-      font-size:16px;
-      cursor:pointer;
-      transition:0.3s;
-    }
-
-    button:hover{
-      background:#1d4ed8;
-    }
-
-    h2{
-      margin:30px 0 15px;
-      color:#2563eb;
-    }
-
-    .cards{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
-      gap:20px;
-    }
-
-    .card{
-      background:white;
-      padding:20px;
-      border-radius:16px;
-      box-shadow:0 4px 12px rgba(0,0,0,0.08);
-      transition:0.3s;
-    }
-
-    .card:hover{
-      transform:translateY(-3px);
-    }
-
-    .price{
-      color:green;
-      font-size:24px;
-      font-weight:bold;
-      margin-top:10px;
-    }
-
-    .rating{
-      color:orange;
-      margin-top:10px;
-    }
-
-    .empty{
-      text-align:center;
-      color:#64748b;
-    }
-
-    .message{
-      margin-bottom:15px;
-    }
-
-  </style>
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fly and Lodget</title>
+  <link rel="stylesheet" href="css/styles.css" />
 </head>
-
 <body>
-
-  <header>
-
-    <h1>✈️ Travel Search PRO</h1>
-
-    <p>
-      Buscador inteligente de vuelos y hoteles
-    </p>
-
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">✈</span>
+      <span>Fly and Lodget</span>
+    </div>
+    <nav>
+      <a href="#inicio">Inicio</a>
+      <a href="#buscar">Buscar</a>
+      <a href="#mis-viajes">Mis viajes</a>
+    </nav>
+    <div class="session-actions" id="sessionActions">
+      <button class="ghost" data-open="loginModal">Ingresar</button>
+      <button class="primary small" data-open="registroModal">Crear cuenta</button>
+    </div>
+    <div class="user-pill hidden" id="userPill">
+      <span id="userName"></span>
+      <button class="ghost small" id="logoutBtn">Salir</button>
+    </div>
   </header>
 
-  <div class="container">
+  <main>
+    <section class="hero" id="inicio">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <p class="eyebrow">Tu próximo destino comienza aquí</p>
+        <h1>Encuentra vuelos y alojamientos para tu viaje ideal</h1>
+        <p class="hero-copy">Busca por destino, fechas de ida y vuelta, compara opciones y guarda tus favoritos.</p>
+        <div class="hero-card" id="buscar">
+          <form id="searchForm" class="search-grid">
+            <div class="field wide">
+              <label>¿Qué viaje quieres realizar?</label>
+              <input id="texto" placeholder="Ej: Quiero viajar a Río de Janeiro del 2026-07-10 al 2026-07-17" />
+            </div>
+            <div class="field">
+              <label>Origen</label>
+              <input id="origen" value="Santiago" />
+            </div>
+            <div class="field">
+              <label>Destino</label>
+              <input id="destino" placeholder="Buenos Aires, Lima, Cancún..." />
+            </div>
+            <div class="field">
+              <label>Ida</label>
+              <input id="fechaIda" type="date" />
+            </div>
+            <div class="field">
+              <label>Vuelta</label>
+              <input id="fechaVuelta" type="date" />
+            </div>
+            <div class="field">
+              <label>Personas</label>
+              <input id="personas" type="number" min="1" value="1" />
+            </div>
+            <button class="primary search-btn" type="submit">Buscar viaje</button>
+          </form>
+        </div>
+      </div>
+    </section>
 
-    <!-- BUSCADOR -->
-
-    <div class="search-box">
-
-      <div class="grid">
-
-        <input
-          type="text"
-          id="origen"
-          placeholder="Origen (ej: Santiago)"
-        >
-
-        <input
-          type="text"
-          id="destino"
-          placeholder="Destino"
-        >
-
-        <input
-          type="number"
-          id="presupuesto"
-          placeholder="Presupuesto total"
-        >
-
-        <select id="prioridad">
-
-          <option value="balance">
-            Balance
-          </option>
-
-          <option value="precio">
-            Más barato
-          </option>
-
-          <option value="rating">
-            Mejor rating
-          </option>
-
-        </select>
-
+    <section class="content-wrap">
+      <div class="section-title">
+        <div>
+          <p class="eyebrow teal">Resultados</p>
+          <h2>Opciones disponibles</h2>
+        </div>
+        <span id="searchStatus" class="status-pill">Realiza una búsqueda</span>
       </div>
 
-      <button onclick="buscar()">
-        Buscar viaje
-      </button>
+      <div class="featured-grid" id="featuredGrid"></div>
+      <div class="results-grid" id="resultsGrid"></div>
+    </section>
 
+    <section class="content-wrap dashboard" id="mis-viajes">
+      <div class="panel-header">
+        <div>
+          <p class="eyebrow teal">Panel de usuario</p>
+          <h2>Mis viajes guardados</h2>
+        </div>
+        <button class="secondary" id="refreshTrips">Actualizar</button>
+      </div>
+      <div class="saved-list" id="savedTrips">
+        <p class="muted">Inicia sesión para ver tus viajes guardados.</p>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal" id="loginModal">
+    <div class="modal-card">
+      <button class="close" data-close>×</button>
+      <h2>Iniciar sesión</h2>
+      <p class="muted">Ingresa a tu cuenta para guardar tus viajes.</p>
+      <form id="loginForm" class="auth-form">
+        <label>Correo</label>
+        <input type="email" name="email" required />
+        <label>Contraseña</label>
+        <input type="password" name="password" required />
+        <button class="primary" type="submit">Ingresar</button>
+      </form>
     </div>
-
-    <!-- MENSAJES -->
-
-    <div
-      id="mensaje"
-      class="message"
-    ></div>
-
-    <!-- RECOMENDADO -->
-
-    <h2>⭐ Recomendado</h2>
-
-    <div
-      class="cards"
-      id="mejor"
-    ></div>
-
-    <!-- ECONOMICO -->
-
-    <h2>💸 Más económico</h2>
-
-    <div
-      class="cards"
-      id="economico"
-    ></div>
-
-    <!-- MAS BARATOS -->
-
-    <h2>💰 Opciones más baratas</h2>
-
-    <div
-      class="cards"
-      id="baratos"
-    ></div>
-
-    <!-- VUELOS -->
-
-    <h2>✈️ Vuelos</h2>
-
-    <div
-      class="cards"
-      id="vuelos"
-    ></div>
-
-    <!-- HOTELES -->
-
-    <h2>🏨 Hoteles</h2>
-
-    <div
-      class="cards"
-      id="hoteles"
-    ></div>
-
   </div>
 
-  <script>
-
-    async function buscar() {
-
-      const origen =
-        document
-          .getElementById("origen")
-          .value
-          .trim();
-
-      const destino =
-        document
-          .getElementById("destino")
-          .value
-          .trim();
-
-      const presupuesto =
-        document
-          .getElementById("presupuesto")
-          .value;
-
-      const prioridad =
-        document
-          .getElementById("prioridad")
-          .value;
-
-      const mensajeDiv =
-        document.getElementById("mensaje");
-
-      const mejorDiv =
-        document.getElementById("mejor");
-
-      const economicoDiv =
-        document.getElementById("economico");
-
-      const vuelosDiv =
-        document.getElementById("vuelos");
-
-      const hotelesDiv =
-        document.getElementById("hoteles");
-
-      const baratosDiv =
-        document.getElementById("baratos");
-
-      // LIMPIAR
-
-      mensajeDiv.innerHTML = "";
-
-      mejorDiv.innerHTML = "";
-
-      economicoDiv.innerHTML = "";
-
-      vuelosDiv.innerHTML = "";
-
-      hotelesDiv.innerHTML = "";
-
-      baratosDiv.innerHTML = "";
-
-      try {
-
-        const response =
-          await fetch(
-
-            `http://localhost:3000/buscar?origen=${encodeURIComponent(origen)}&destino=${encodeURIComponent(destino)}&presupuesto=${presupuesto}&prioridad=${prioridad}`
-
-          );
-
-        const data =
-          await response.json();
-
-        console.log(data);
-
-        // =====================================
-        // ERROR
-        // =====================================
-
-        if (data.error) {
-
-          mensajeDiv.innerHTML = `
-
-            <div class="card empty">
-
-              ${data.error}
-
-            </div>
-
-          `;
-
-          return;
-        }
-
-        // =====================================
-        // MENSAJES
-        // =====================================
-
-        if (data.mensaje) {
-
-          mensajeDiv.innerHTML = `
-
-            <div class="card">
-
-              ${data.mensaje}
-
-            </div>
-
-          `;
-        }
-
-        // =====================================
-        // RECOMENDADO
-        // =====================================
-
-        if (data.mejor) {
-
-          mejorDiv.innerHTML = `
-
-            <div class="card">
-
-              <h3>
-                ⭐ Mejor combinación
-              </h3>
-
-              <br>
-
-              <p>
-                ✈️
-                ${
-                  data.mejor.vuelo
-                  ? data.mejor.vuelo.aerolinea
-                  : data.mejor.ida.aerolinea
-                }
-              </p>
-
-              <p>
-                🏨
-                ${data.mejor.hotel.nombre}
-              </p>
-
-              <br>
-
-              <p class="price">
-
-                $${data.mejor.total}
-
-              </p>
-
-            </div>
-
-          `;
-        }
-
-        // =====================================
-        // ECONOMICO
-        // =====================================
-
-        if (data.economico) {
-
-          economicoDiv.innerHTML = `
-
-            <div class="card">
-
-              <h3>
-                💸 Más económico
-              </h3>
-
-              <br>
-
-              <p>
-
-                ✈️
-                ${data.economico.vuelo.aerolinea}
-
-              </p>
-
-              <p>
-
-                🏨
-                ${data.economico.hotel.nombre}
-
-              </p>
-
-              <br>
-
-              <p class="price">
-
-                $${data.economico.total}
-
-              </p>
-
-            </div>
-
-          `;
-        }
-
-        // =====================================
-        // MÁS BARATOS
-        // =====================================
-
-        let htmlBaratos = "";
-
-        if (data.vueloMasBarato) {
-
-          htmlBaratos += `
-
-            <div class="card">
-
-              <h3>
-                ✈️ Vuelo más barato
-              </h3>
-
-              <br>
-
-              <p>
-
-                ${data.vueloMasBarato.aerolinea}
-
-              </p>
-
-              <p class="price">
-
-                $${data.vueloMasBarato.precio}
-
-              </p>
-
-            </div>
-
-          `;
-        }
-
-        if (data.hotelMasBarato) {
-
-          htmlBaratos += `
-
-            <div class="card">
-
-              <h3>
-                🏨 Hotel más barato
-              </h3>
-
-              <br>
-
-              <p>
-
-                ${data.hotelMasBarato.nombre}
-
-              </p>
-
-              <p class="price">
-
-                $${data.hotelMasBarato.precio}
-
-              </p>
-
-            </div>
-
-          `;
-        }
-
-        baratosDiv.innerHTML =
-          htmlBaratos;
-
-        // =====================================
-        // VUELOS
-        // =====================================
-
-        if (
-          data.vuelosIda &&
-          data.vuelosIda.length > 0
-        ) {
-
-          data.vuelosIda.forEach(v => {
-
-            vuelosDiv.innerHTML += `
-
-              <div class="card">
-
-                <h3>
-
-                  ${v.aerolinea}
-
-                </h3>
-
-                <br>
-
-                <p>
-
-                  ${v.origen}
-                  →
-                  ${v.destino}
-
-                </p>
-
-                <p>
-
-                  ⏱ ${v.duracion}
-
-                </p>
-
-                <p class="price">
-
-                  $${v.precio}
-
-                </p>
-
-              </div>
-
-            `;
-          });
-
-        } else {
-
-          vuelosDiv.innerHTML = `
-
-            <div class="card empty">
-
-              No hay vuelos disponibles
-
-            </div>
-
-          `;
-        }
-
-        // =====================================
-        // HOTELES
-        // =====================================
-
-        if (
-          data.hoteles &&
-          data.hoteles.length > 0
-        ) {
-
-          data.hoteles.forEach(h => {
-
-            hotelesDiv.innerHTML += `
-
-              <div class="card">
-
-                <h3>
-
-                  ${h.nombre}
-
-                </h3>
-
-                <br>
-
-                <p>
-
-                  📍 ${h.ciudad}
-
-                </p>
-
-                <p class="rating">
-
-                  ⭐ ${h.rating}
-
-                </p>
-
-                <p class="price">
-
-                  $${h.precio}
-
-                </p>
-
-              </div>
-
-            `;
-          });
-
-        } else {
-
-          hotelesDiv.innerHTML = `
-
-            <div class="card empty">
-
-              No hay hoteles disponibles
-
-            </div>
-
-          `;
-        }
-
-      } catch (error) {
-
-        console.error(error);
-
-        mensajeDiv.innerHTML = `
-
-          <div class="card empty">
-
-            ❌ Error conectando con servidor
-
-          </div>
-
-        `;
-      }
-    }
-
-  </script>
-
+  <div class="modal" id="registroModal">
+    <div class="modal-card">
+      <button class="close" data-close>×</button>
+      <h2>Crear cuenta</h2>
+      <p class="muted">Registra tus datos para guardar tus próximas escapadas.</p>
+      <form id="registroForm" class="auth-form">
+        <label>Nombre</label>
+        <input name="nombre" required />
+        <label>Correo</label>
+        <input type="email" name="email" required />
+        <label>Contraseña</label>
+        <input type="password" name="password" minlength="4" required />
+        <button class="primary" type="submit">Crear cuenta</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="js/app.js"></script>
 </body>
-
 </html>

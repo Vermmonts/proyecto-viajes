@@ -1,211 +1,43 @@
-require("dotenv").config();
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
+require('dotenv').config();
 
-const express = require("express");
-const cors = require("cors");
-
-const buscarVuelos =
-  require("./services/vuelos");
-
-const buscarHoteles =
-  require("./services/hoteles");
+const authRoutes = require('./routes/auth');
+const searchRoutes = require('./routes/search');
+const tripRoutes = require('./routes/trips');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// =====================================
-// BUSQUEDA
-// =====================================
+const frontendPath = path.join(__dirname, '../frontend');
+app.use(express.static(frontendPath));
 
-app.get("/buscar", async (req, res) => {
+app.use('/api/auth', authRoutes);
+app.use('/api/buscar', searchRoutes);
+app.use('/api/mis-viajes', tripRoutes);
 
+app.get('/api/debug/db', async (req, res) => {
   try {
-
-    const {
-      origen,
-      destino,
-      presupuesto,
-      prioridad
-    } = req.query;
-
-    // =====================================
-    // VALIDACIONES
-    // =====================================
-
-    if (!destino || destino.trim() === "") {
-
-      return res.json({
-        error:
-          "Debe ingresar un destino"
-      });
-    }
-
-    // =====================================
-    // MENSAJES
-    // =====================================
-
-    let mensaje = null;
-
-    if (
-      presupuesto &&
-      Number(presupuesto) < 150000
-    ) {
-
-      mensaje =
-        "⚠️ El presupuesto ingresado es muy bajo para viajes internacionales.";
-    }
-
-    // =====================================
-    // BUSQUEDA
-    // =====================================
-
-    const vuelos =
-      await buscarVuelos(
-        origen,
-        destino
-      );
-
-    const hoteles =
-      await buscarHoteles(
-        destino
-      );
-
-    // =====================================
-    // SIN RESULTADOS
-    // =====================================
-
-    if (
-      vuelos.length === 0 &&
-      hoteles.length === 0
-    ) {
-
-      return res.json({
-        mensaje:
-          "No se encontraron resultados."
-      });
-    }
-
-    // =====================================
-    // VUELO MÁS BARATO
-    // =====================================
-
-    let vueloMasBarato = null;
-
-    if (vuelos.length > 0) {
-
-      vueloMasBarato =
-        vuelos.reduce((min, v) =>
-          v.precio < min.precio ? v : min
-        );
-    }
-
-    // =====================================
-    // HOTEL MÁS BARATO
-    // =====================================
-
-    let hotelMasBarato = null;
-
-    if (hoteles.length > 0) {
-
-      hotelMasBarato =
-        hoteles.reduce((min, h) =>
-          h.precio < min.precio ? h : min
-        );
-    }
-
-    // =====================================
-    // COMBO ECONOMICO
-    // =====================================
-
-    let economico = null;
-
-    if (
-      vueloMasBarato &&
-      hotelMasBarato
-    ) {
-
-      economico = {
-
-        vuelo:
-          vueloMasBarato,
-
-        hotel:
-          hotelMasBarato,
-
-        total:
-          vueloMasBarato.precio +
-          hotelMasBarato.precio
-      };
-    }
-
-    // =====================================
-    // RECOMENDACION
-    // =====================================
-
-    let mejor = economico;
-
-    if (
-      prioridad === "rating" &&
-      hoteles.length > 0 &&
-      vuelos.length > 0
-    ) {
-
-      const mejorHotel =
-        hoteles.reduce((max, h) =>
-          h.rating > max.rating ? h : max
-        );
-
-      mejor = {
-
-        ida: vuelos[0],
-
-        hotel: mejorHotel,
-
-        total:
-          vuelos[0].precio +
-          mejorHotel.precio
-      };
-    }
-
-    // =====================================
-
-    res.json({
-
-      mensaje,
-
-      vuelosIda: vuelos,
-
-      hoteles,
-
-      vueloMasBarato,
-
-      hotelMasBarato,
-
-      economico,
-
-      mejor
-
-    });
-
+    const pool = require('./db');
+    const [[vuelos]] = await pool.query('SELECT COUNT(*) AS total FROM vuelos');
+    const [[hoteles]] = await pool.query('SELECT COUNT(*) AS total FROM hoteles');
+    const [muestra] = await pool.query('SELECT origen, destino, fecha_salida, fecha_regreso, precio FROM vuelos ORDER BY id DESC LIMIT 5');
+    res.json({ ok: true, db: process.env.DB_NAME, port: process.env.DB_PORT || 3306, vuelos: vuelos.total, hoteles: hoteles.total, muestra });
   } catch (error) {
-
-    console.error(error);
-
-    res.status(500).json({
-      error:
-        "Error en servidor"
-    });
+    res.status(500).json({ ok: false, message: error.message, db: process.env.DB_NAME, port: process.env.DB_PORT || 3306 });
   }
 });
 
-// =====================================
 
-const PORT = 3000;
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
 
 app.listen(PORT, () => {
-
-  console.log(
-    `Servidor corriendo en puerto ${PORT}`
-  );
+  console.log(`Fly and Lodget disponible en http://localhost:${PORT}`);
 });
