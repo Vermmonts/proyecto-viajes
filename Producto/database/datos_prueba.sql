@@ -1,6 +1,6 @@
 USE viajes_app;
 
-INSERT INTO vuelos (aerolinea, origen, destino, codigo_origen, codigo_destino, fecha_salida, hora_salida, fecha_regreso, hora_regreso, precio, escalas, puntuacion) VALUES
+INSERT IGNORE INTO vuelos (aerolinea, origen, destino, codigo_origen, codigo_destino, fecha_salida, hora_salida, fecha_regreso, hora_regreso, precio, escalas, puntuacion) VALUES
 ('LATAM Airlines', 'Santiago', 'Buenos Aires', 'SCL', 'EZE', '2026-07-10', '08:15:00', '2026-07-17', '19:30:00', 145000, 0, 4.7),
 ('Sky Airline', 'Santiago', 'Buenos Aires', 'SCL', 'EZE', '2026-07-10', '11:40:00', '2026-07-17', '21:15:00', 118000, 0, 4.3),
 ('JetSMART', 'Santiago', 'Buenos Aires', 'SCL', 'AEP', '2026-07-10', '06:50:00', '2026-07-17', '22:05:00', 99000, 0, 4.0),
@@ -14,7 +14,7 @@ INSERT INTO vuelos (aerolinea, origen, destino, codigo_origen, codigo_destino, f
 ('Sky Airline', 'Santiago', 'Rio de Janeiro', 'SCL', 'GIG', '2026-08-05', '13:10:00', '2026-08-12', '20:40:00', 210000, 1, 4.2),
 ('LATAM Airlines', 'Santiago', 'Lima', 'SCL', 'LIM', '2026-08-05', '10:00:00', '2026-08-12', '15:20:00', 160000, 0, 4.6);
 
-INSERT INTO hoteles (nombre, ciudad, direccion, estrellas, puntuacion, precio_noche, imagen) VALUES
+INSERT IGNORE INTO hoteles (nombre, ciudad, direccion, estrellas, puntuacion, precio_noche, imagen) VALUES
 ('Hotel Madero Buenos Aires', 'Buenos Aires', 'Puerto Madero', 5, 4.8, 92000, 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&w=900&q=80'),
 ('NH Buenos Aires City', 'Buenos Aires', 'Centro Histórico', 4, 4.5, 68000, 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&w=900&q=80'),
 ('Ibis Buenos Aires Obelisco', 'Buenos Aires', 'Av. Corrientes', 3, 4.1, 42000, 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=900&q=80'),

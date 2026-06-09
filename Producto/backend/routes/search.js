@@ -4,6 +4,24 @@ const { parseWithGemini } = require('../services/searchParser');
 
 const router = express.Router();
 
+const cache = { vuelos: null, hoteles: null };
+
+async function getColumns(table) {
+  if (cache[table]) return cache[table];
+  const [cols] = await pool.query(`SHOW COLUMNS FROM ${table}`);
+  cache[table] = new Set(cols.map(c => c.Field));
+  return cache[table];
+}
+
+function normalizar(txt = '') {
+  return String(txt).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function contiene(a, b) {
+  if (!b) return true;
+  return normalizar(a).includes(normalizar(b));
+}
+
 router.post('/', async (req, res) => {
   try {
     const filtros = await parseWithGemini(req.body);
@@ -44,7 +62,7 @@ router.post('/', async (req, res) => {
       });
     });
 
-    combinaciones.sort((a, b) => a.total_estimado - b.total_estimado || Number(b.hotel.puntuacion) - Number(a.hotel.puntuacion));
+    combinaciones.sort((a, b) => a.total_estimado - b.total_estimado || Number(b.hotel.puntuacion || 0) - Number(a.hotel.puntuacion || 0));
 
     res.json({
       ok: true,
@@ -52,6 +70,7 @@ router.post('/', async (req, res) => {
       modo,
       encontrados: combinaciones.length,
       mensaje: combinaciones.length ? 'Resultados encontrados.' : 'No se encontraron viajes disponibles para la búsqueda seleccionada.',
+      ia: { usada: Boolean(filtros.ia_usada), modelo: filtros.ia_modelo || null, motivo: filtros.ia_motivo || null },
       destacados: { economico, mejorValorado },
       vuelos,
       hoteles,
@@ -59,33 +78,35 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('ERROR BUSQUEDA:', error);
-    res.status(500).json({ ok: false, message: 'No se pudo realizar la búsqueda.', detail: error.message });
+    res.status(500).json({ ok: false, message: `No se pudo realizar la búsqueda: ${error.message}` });
   }
 });
 
-function normalizar(txt = '') {
-  return String(txt).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
 async function buscarViajes(filtros, opciones) {
+  const vueloCols = await getColumns('vuelos');
+  const hotelCols = await getColumns('hoteles');
+
   const flightParams = [];
   const hotelParams = [];
-  let flightWhere = 'WHERE disponible = 1';
-  let hotelWhere = 'WHERE disponible = 1';
+  let flightWhere = 'WHERE 1=1';
+  let hotelWhere = 'WHERE 1=1';
+
+  if (vueloCols.has('disponible')) flightWhere += ' AND disponible = 1';
+  if (hotelCols.has('disponible')) hotelWhere += ' AND disponible = 1';
 
   if (opciones.usarOrigen && filtros.origen) {
     flightWhere += ' AND LOWER(origen) LIKE ?';
-    flightParams.push(`%${normalizar(filtros.origen)}%`);
+    flightParams.push(`%${String(filtros.origen).toLowerCase()}%`);
   }
 
   if (opciones.usarDestino && filtros.destino) {
     flightWhere += ' AND LOWER(destino) LIKE ?';
     hotelWhere += ' AND LOWER(ciudad) LIKE ?';
-    flightParams.push(`%${normalizar(filtros.destino)}%`);
-    hotelParams.push(`%${normalizar(filtros.destino)}%`);
+    flightParams.push(`%${String(filtros.destino).toLowerCase()}%`);
+    hotelParams.push(`%${String(filtros.destino).toLowerCase()}%`);
   }
 
-  if (opciones.usarFechas && filtros.fechaIda) {
+  if (opciones.usarFechas && filtros.fechaIda && vueloCols.has('fecha_salida')) {
     if (opciones.exacto) {
       flightWhere += ' AND fecha_salida = ?';
       flightParams.push(filtros.fechaIda);
@@ -95,7 +116,7 @@ async function buscarViajes(filtros, opciones) {
     }
   }
 
-  if (opciones.usarFechas && filtros.fechaVuelta) {
+  if (opciones.usarFechas && filtros.fechaVuelta && vueloCols.has('fecha_regreso')) {
     if (opciones.exacto) {
       flightWhere += ' AND fecha_regreso = ?';
       flightParams.push(filtros.fechaVuelta);
@@ -105,17 +126,41 @@ async function buscarViajes(filtros, opciones) {
     }
   }
 
+  const vueloPuntuacion = vueloCols.has('puntuacion') ? 'puntuacion' : '4.0 AS puntuacion';
+  const vueloDisponible = vueloCols.has('disponible') ? 'disponible' : '1 AS disponible';
+  const horaSalida = vueloCols.has('hora_salida') ? 'hora_salida' : 'NULL AS hora_salida';
+  const horaRegreso = vueloCols.has('hora_regreso') ? 'hora_regreso' : 'NULL AS hora_regreso';
+
+  let hotelPuntuacion = '4.0 AS puntuacion';
+  if (hotelCols.has('puntuacion')) hotelPuntuacion = 'puntuacion';
+  else if (hotelCols.has('valoracion')) hotelPuntuacion = 'valoracion AS puntuacion';
+  const hotelImagen = hotelCols.has('imagen') ? 'imagen' : 'NULL AS imagen';
+  const hotelDisponible = hotelCols.has('disponible') ? 'disponible' : '1 AS disponible';
+
+  const vueloOrder = vueloCols.has('puntuacion') ? 'ORDER BY precio ASC, puntuacion DESC' : 'ORDER BY precio ASC';
+  const hotelOrder = hotelCols.has('puntuacion') ? 'ORDER BY puntuacion DESC, precio_noche ASC' : (hotelCols.has('valoracion') ? 'ORDER BY valoracion DESC, precio_noche ASC' : 'ORDER BY precio_noche ASC');
+
   const [vuelos] = await pool.query(
-    `SELECT * FROM vuelos ${flightWhere} ORDER BY precio ASC, puntuacion DESC LIMIT 40`,
+    `SELECT id, aerolinea, origen, destino, fecha_salida, fecha_regreso, precio, escalas, ${horaSalida}, ${horaRegreso}, ${vueloPuntuacion}, ${vueloDisponible}
+     FROM vuelos ${flightWhere} ${vueloOrder} LIMIT 40`,
     flightParams
   );
 
   const [hoteles] = await pool.query(
-    `SELECT * FROM hoteles ${hotelWhere} ORDER BY puntuacion DESC, precio_noche ASC LIMIT 40`,
+    `SELECT id, nombre, ciudad, estrellas, precio_noche, ${hotelPuntuacion}, ${hotelImagen}, ${hotelDisponible}
+     FROM hoteles ${hotelWhere} ${hotelOrder} LIMIT 40`,
     hotelParams
   );
 
-  return { vuelos, hoteles };
+  // Respaldo en memoria para búsquedas con acentos (Cancún/Cancun, Río/Rio).
+  const vuelosFiltrados = opciones.usarDestino || opciones.usarOrigen
+    ? vuelos.filter(v => (!opciones.usarOrigen || contiene(v.origen, filtros.origen)) && (!opciones.usarDestino || contiene(v.destino, filtros.destino)))
+    : vuelos;
+  const hotelesFiltrados = opciones.usarDestino
+    ? hoteles.filter(h => contiene(h.ciudad, filtros.destino))
+    : hoteles;
+
+  return { vuelos: vuelosFiltrados, hoteles: hotelesFiltrados };
 }
 
 function calcularNoches(ida, vuelta) {

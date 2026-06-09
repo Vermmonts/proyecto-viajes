@@ -2,7 +2,8 @@ const API = '';
 const state = {
   token: localStorage.getItem('token'),
   user: JSON.parse(localStorage.getItem('user') || 'null'),
-  lastResults: []
+  lastResults: [],
+  savedTrips: []
 };
 
 const $ = (id) => document.getElementById(id);
@@ -18,6 +19,15 @@ function toast(message) {
   setTimeout(() => el.classList.remove('show'), 3200);
 }
 
+function escapeHtml(value = '') {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
 function updateSessionUI() {
   const logged = Boolean(state.token && state.user);
   $('sessionActions').classList.toggle('hidden', logged);
@@ -29,17 +39,44 @@ function updateSessionUI() {
 async function request(url, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
-  const res = await fetch(API + url, { ...options, headers });
+  let res;
+  try {
+    res = await fetch(API + url, { ...options, headers });
+  } catch (error) {
+    throw new Error('No se pudo conectar con el backend. Revisa que hayas iniciado el servidor con npm start en Producto/backend.');
+  }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || 'No se pudo completar la operación.');
+  if (!res.ok) throw new Error(data.message || data.mensaje || 'No se pudo completar la operación.');
   return data;
 }
 
 function openModal(id) { $(id).classList.add('open'); }
 function closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
 
+
+function resetHomeView() {
+  state.lastResults = [];
+  $('featuredGrid').innerHTML = '';
+  $('resultsGrid').innerHTML = '';
+  $('searchStatus').textContent = 'Realiza una búsqueda';
+  $('texto').value = '';
+  $('origen').value = '';
+  $('destino').value = '';
+  $('fechaIda').value = '';
+  $('fechaVuelta').value = '';
+  $('personas').value = 1;
+}
+
+
 document.querySelectorAll('[data-open]').forEach(btn => btn.addEventListener('click', () => openModal(btn.dataset.open)));
 document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', closeModals));
+
+document.querySelectorAll('a[href="#inicio"]').forEach(link => {
+  link.addEventListener('click', () => {
+    resetHomeView();
+    closeModals();
+  });
+});
 
 $('logoutBtn').addEventListener('click', () => {
   localStorage.removeItem('token');
@@ -50,7 +87,7 @@ $('logoutBtn').addEventListener('click', () => {
   toast('Sesión cerrada.');
 });
 
-$('registerForm').addEventListener('submit', async (e) => {
+$('registroForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = new FormData(e.target);
   try {
@@ -97,6 +134,11 @@ $('searchForm').addEventListener('submit', async (e) => {
     personas: $('personas').value
   };
 
+  if (payload.origen && payload.destino && payload.origen.trim().toLowerCase() === payload.destino.trim().toLowerCase()) {
+    toast('El origen y el destino no pueden ser iguales. Revisa los campos Desde y Hasta.');
+    return;
+  }
+
   $('searchStatus').textContent = 'Buscando opciones...';
   $('featuredGrid').innerHTML = '';
   $('resultsGrid').innerHTML = '';
@@ -109,7 +151,8 @@ $('searchForm').addEventListener('submit', async (e) => {
     renderResults(data.resultados, data.mensaje);
   } catch (err) {
     $('searchStatus').textContent = 'No se pudo buscar';
-    renderResults([], 'No se encontraron viajes disponibles en este momento.');
+    renderResults([], err.message || 'No se encontraron viajes disponibles en este momento.');
+    toast(err.message || 'No se pudo buscar');
   }
 });
 
@@ -183,12 +226,14 @@ window.saveTrip = async function(index) {
 
 async function loadTrips() {
   if (!state.token) {
+    state.savedTrips = [];
     $('savedTrips').innerHTML = '<p class="muted">Inicia sesión para ver tus viajes guardados.</p>';
     return;
   }
   try {
     const data = await request('/api/mis-viajes');
     const viajes = data.viajes || [];
+    state.savedTrips = viajes;
     if (!viajes.length) {
       $('savedTrips').innerHTML = '<p class="muted">Aún no tienes viajes guardados.</p>';
       return;
@@ -196,16 +241,56 @@ async function loadTrips() {
     $('savedTrips').innerHTML = viajes.map(v => `
       <div class="saved-item">
         <div>
-          <h3>${v.origen} → ${v.destino}</h3>
-          <p class="muted">${v.aerolinea} · ${v.fecha_salida} a ${v.fecha_regreso} · ${v.hotel} · ${v.puntuacion} ★</p>
+          <h3>${escapeHtml(v.origen)} → ${escapeHtml(v.destino)}</h3>
+          <p class="muted">${escapeHtml(v.aerolinea)} · ${v.fecha_salida} a ${v.fecha_regreso} · ${escapeHtml(v.hotel)} · ${v.puntuacion} ★</p>
+          <p class="muted"><strong>Estado:</strong> ${escapeHtml(v.estado || 'planificado')} ${v.notas ? `· <strong>Nota:</strong> ${escapeHtml(v.notas)}` : ''}</p>
         </div>
-        <button class="secondary" onclick="deleteTrip(${v.id})">Quitar</button>
+        <div class="saved-actions">
+          <button class="secondary" onclick="openEditTrip(${v.id})">Editar</button>
+          <button class="ghost danger" onclick="deleteTrip(${v.id})">Quitar</button>
+        </div>
       </div>
     `).join('');
   } catch (err) {
     $('savedTrips').innerHTML = '<p class="muted">No se pudieron cargar tus viajes.</p>';
   }
 }
+
+
+window.openEditTrip = function(id) {
+  const viaje = state.savedTrips.find(v => Number(v.id) === Number(id));
+  if (!viaje) {
+    toast('No se encontró el viaje seleccionado.');
+    return;
+  }
+  $('editTripId').value = viaje.id;
+  $('editVueloId').value = viaje.vuelo_id;
+  $('editHotelId').value = viaje.hotel_id;
+  $('editEstado').value = viaje.estado || 'planificado';
+  $('editNotas').value = viaje.notas || '';
+  $('editTripTitle').textContent = `${viaje.origen} → ${viaje.destino}`;
+  openModal('editTripModal');
+};
+
+$('editTripForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = $('editTripId').value;
+  const payload = {
+    vuelo_id: $('editVueloId').value,
+    hotel_id: $('editHotelId').value,
+    estado: $('editEstado').value,
+    notas: $('editNotas').value
+  };
+  try {
+    await request(`/api/mis-viajes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+    closeModals();
+    toast('Viaje actualizado.');
+    loadTrips();
+  } catch (err) { toast(err.message); }
+});
 
 window.deleteTrip = async function(id) {
   try {

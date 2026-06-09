@@ -5,7 +5,8 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "dev": "node app.js"
+    "dev": "node app.js",
+    "setup-db": "node initDatabase.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

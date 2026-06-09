@@ -41,11 +41,11 @@
               <input id="texto" placeholder="Ej: Quiero viajar a Río de Janeiro del 2026-07-10 al 2026-07-17" />
             </div>
             <div class="field">
-              <label>Origen</label>
-              <input id="origen" value="Santiago" />
+              <label>Desde</label>
+              <input id="origen" placeholder="Santiago, Concepción, La Serena..." />
             </div>
             <div class="field">
-              <label>Destino</label>
+              <label>Hasta</label>
               <input id="destino" placeholder="Buenos Aires, Lima, Cancún..." />
             </div>
             <div class="field">
@@ -121,6 +121,30 @@
         <label>Contraseña</label>
         <input type="password" name="password" minlength="4" required />
         <button class="primary" type="submit">Crear cuenta</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="editTripModal">
+    <div class="modal-card">
+      <button class="close" data-close>×</button>
+      <h2>Editar viaje</h2>
+      <p class="muted" id="editTripTitle">Actualiza el estado o la nota de tu viaje.</p>
+      <form id="editTripForm" class="auth-form">
+        <input type="hidden" id="editTripId" />
+        <input type="hidden" id="editVueloId" />
+        <input type="hidden" id="editHotelId" />
+        <label>Estado</label>
+        <select id="editEstado">
+          <option value="planificado">Planificado</option>
+          <option value="reservado">Reservado</option>
+          <option value="pagado">Pagado</option>
+          <option value="realizado">Realizado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+        <label>Notas</label>
+        <textarea id="editNotas" maxlength="500" placeholder="Ej: Comprar equipaje, revisar hotel o confirmar traslado."></textarea>
+        <button class="primary" type="submit">Guardar cambios</button>
       </form>
     </div>
   </div>

@@ -13,20 +13,20 @@ const meses = {
 };
 
 function quitarTildes(valor = '') {
-  return String(valor).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return String(valor).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 }
 
 function normalizarDestino(valor = '') {
   const v = quitarTildes(valor);
-  if (v.includes('rio')) return 'Rio de Janeiro';
+  if (!v) return '';
+  if (v.includes('rio de janeiro') || v === 'rio') return 'Rio de Janeiro';
   if (v.includes('buenos')) return 'Buenos Aires';
   if (v.includes('cancun')) return 'Cancún';
   if (v.includes('bogota')) return 'Bogotá';
   if (v.includes('mexico')) return 'Ciudad de México';
-  if (v.includes('punta')) return 'Punta Cana';
-  if (v.includes('flor')) return 'Florianópolis';
-  const found = destinos.find(d => v.includes(quitarTildes(d)));
-  return found || valor;
+  if (v.includes('florianopolis') || v.includes('floripa')) return 'Florianópolis';
+  const found = destinos.find(d => v === quitarTildes(d) || v.includes(quitarTildes(d)) || quitarTildes(d).includes(v));
+  return found || String(valor).trim();
 }
 
 function toDateISO(text) {
@@ -73,66 +73,146 @@ function parseFechasEspanol(texto = '') {
   return { fechaIda: '', fechaVuelta: '' };
 }
 
-function detectarDestino(texto = '') {
+function detectarCiudadEnTexto(fragmento = '') {
+  const limpio = quitarTildes(fragmento).replace(/\s+/g, ' ').trim();
+  if (!limpio) return '';
+  return destinos.find(d => limpio === quitarTildes(d) || limpio.includes(quitarTildes(d)) || quitarTildes(d).includes(limpio)) || '';
+}
+
+function detectarRuta(texto = '') {
   const lower = quitarTildes(texto);
-  return destinos.find(d => lower.includes(quitarTildes(d))) || '';
+  // Casos: "desde Santiago hasta Lima", "de Santiago a Lima", "Santiago hacia Madrid".
+  const patrones = [
+    /(?:desde|de)\s+([a-záéíóúñ\s]+?)\s+(?:hasta|a|hacia|para)\s+([a-záéíóúñ\s]+?)(?:\s+del|\s+desde|\s+entre|\s+por|\s+en|\s+con|\s+para|\s+el|\s+\d|$)/i,
+    /([a-záéíóúñ\s]+?)\s+(?:a|hacia|hasta)\s+([a-záéíóúñ\s]+?)(?:\s+del|\s+desde|\s+entre|\s+por|\s+en|\s+con|\s+para|\s+el|\s+\d|$)/i
+  ];
+
+  for (const patron of patrones) {
+    const match = lower.match(patron);
+    if (match) {
+      const origen = detectarCiudadEnTexto(match[1]);
+      const destino = detectarCiudadEnTexto(match[2]);
+      if (origen || destino) return { origen, destino };
+    }
+  }
+
+  // Casos: "quiero viajar a Lima", "viaje para Buenos Aires".
+  const destinoMatch = lower.match(/(?:viajar|viaje|ir|quiero ir)\s+(?:a|hacia|hasta|para)\s+([a-záéíóúñ\s]+?)(?:\s+del|\s+desde|\s+entre|\s+por|\s+en|\s+con|\s+para|\s+el|\s+\d|$)/i);
+  const destino = destinoMatch ? detectarCiudadEnTexto(destinoMatch[1]) : detectarCiudadEnTexto(lower);
+  return { origen: '', destino };
+}
+
+function detectarDestino(texto = '') {
+  return detectarRuta(texto).destino || '';
 }
 
 function detectarOrigen(texto = '') {
-  const lower = quitarTildes(texto);
-  const match = lower.match(/(?:desde|de)\s+([a-z\s]+?)\s+(?:a|hacia|para)\s+/);
-  if (!match) return 'Santiago';
-  const posible = destinos.find(d => quitarTildes(match[1]).includes(quitarTildes(d)) || quitarTildes(d).includes(quitarTildes(match[1]).trim()));
-  return posible || 'Santiago';
+  return detectarRuta(texto).origen || 'Santiago';
+}
+
+function extraerJson(texto = '') {
+  const limpio = String(texto).replace(/```json|```/gi, '').trim();
+  const inicio = limpio.indexOf('{');
+  const fin = limpio.lastIndexOf('}');
+  if (inicio === -1 || fin === -1 || fin <= inicio) throw new Error('Gemini no devolvio JSON.');
+  return JSON.parse(limpio.slice(inicio, fin + 1));
 }
 
 function parseLocal(query = {}) {
   const texto = String(query.texto || query.q || '').trim();
   const fechasTexto = parseFechasEspanol(texto);
-  const destinoFormulario = query.destino || '';
-  const origen = query.origen || detectarOrigen(texto) || 'Santiago';
-  const fechaIda = query.fechaIda || query.ida || fechasTexto.fechaIda || '';
-  const fechaVuelta = query.fechaVuelta || query.vuelta || fechasTexto.fechaVuelta || '';
+  const rutaTexto = detectarRuta(texto);
 
-  let destino = destinoFormulario;
-  if (!destino && texto) destino = detectarDestino(texto);
+  // Prioridad correcta: formulario explícito > texto libre interpretado > valor por defecto.
+  const origenFormulario = String(query.origen || '').trim();
+  const destinoFormulario = String(query.destino || '').trim();
+  const origen = origenFormulario || rutaTexto.origen || 'Santiago';
+  const destino = destinoFormulario || rutaTexto.destino || '';
 
   return {
-    origen: origen || 'Santiago',
+    origen: normalizarDestino(origen) || 'Santiago',
     destino: normalizarDestino(destino),
-    fechaIda,
-    fechaVuelta,
+    fechaIda: query.fechaIda || query.ida || fechasTexto.fechaIda || '',
+    fechaVuelta: query.fechaVuelta || query.vuelta || fechasTexto.fechaVuelta || '',
     personas: Number(query.personas || 1),
     presupuesto: quitarTildes(texto).includes('barato') ? 'bajo' : (query.presupuesto || '')
+  };
+}
+
+function aiEstaConfigurada() {
+  return Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim());
+}
+
+function resolverFiltrosFinales(input, local, parsed = {}) {
+  const origenFormulario = String(input.origen || '').trim();
+  const destinoFormulario = String(input.destino || '').trim();
+
+  let origen = origenFormulario || parsed.origen || local.origen || 'Santiago';
+  let destino = destinoFormulario || parsed.destino || local.destino || '';
+
+  origen = normalizarDestino(origen) || 'Santiago';
+  destino = normalizarDestino(destino);
+
+  // Seguridad: si la IA toma el origen como destino, se corrige usando el texto local.
+  if (local.destino && quitarTildes(destino) === quitarTildes(origen) && quitarTildes(local.destino) !== quitarTildes(origen)) {
+    destino = local.destino;
+  }
+
+  // Si no hay destino explícito en formulario, el parser local manda sobre la IA cuando detectó una ruta "desde ... hasta/a ...".
+  if (!destinoFormulario && local.destino && quitarTildes(local.destino) !== quitarTildes(local.origen || '')) {
+    destino = local.destino;
+  }
+
+  return {
+    ...local,
+    ...parsed,
+    origen,
+    destino,
+    fechaIda: input.fechaIda || input.ida || parsed.fechaIda || local.fechaIda || '',
+    fechaVuelta: input.fechaVuelta || input.vuelta || parsed.fechaVuelta || local.fechaVuelta || '',
+    personas: Number(input.personas || parsed.personas || local.personas || 1),
+    presupuesto: parsed.presupuesto || local.presupuesto || ''
   };
 }
 
 async function parseWithGemini(input) {
   const apiKey = process.env.GEMINI_API_KEY;
   const local = parseLocal(input);
-  if (!apiKey) return local;
+  if (!aiEstaConfigurada()) return { ...local, ia_usada: false, ia_motivo: 'GEMINI_API_KEY no configurada' };
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-1.5-flash' });
-    const prompt = `Extrae filtros de busqueda de viajes. Devuelve SOLO JSON valido, sin markdown.
-Campos: origen, destino, fechaIda, fechaVuelta, personas, presupuesto.
-Si falta origen usa Santiago. Fechas en YYYY-MM-DD.
+    const genAI = new GoogleGenerativeAI(apiKey.trim());
+    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const prompt = `Eres un asistente para una app de viajes conectada a MySQL. Extrae filtros de busqueda desde texto libre y formulario.
+Devuelve SOLO JSON valido, sin markdown ni explicaciones.
+Campos obligatorios:
+{
+  "origen": "ciudad de origen o Santiago si falta",
+  "destino": "ciudad destino o vacio si no aparece",
+  "fechaIda": "YYYY-MM-DD o vacio",
+  "fechaVuelta": "YYYY-MM-DD o vacio",
+  "personas": numero,
+  "presupuesto": "bajo, medio, alto o vacio"
+}
+Reglas importantes:
+- En frases como "desde Santiago hasta Lima" o "de Santiago a Lima", la primera ciudad es origen y la segunda ciudad es destino.
+- No uses el origen como destino.
+- No inventes destino.
+- Conserva fechas ISO.
 Entrada: ${JSON.stringify(input)}`;
     const result = await model.generateContent(prompt);
-    const raw = result.response.text().replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(raw);
+    const raw = result.response.text();
+    const parsed = extraerJson(raw);
     return {
-      ...local,
-      ...parsed,
-      origen: parsed.origen || local.origen,
-      destino: normalizarDestino(parsed.destino || local.destino),
-      fechaIda: parsed.fechaIda || local.fechaIda,
-      fechaVuelta: parsed.fechaVuelta || local.fechaVuelta
+      ...resolverFiltrosFinales(input, local, parsed),
+      ia_usada: true,
+      ia_modelo: modelName
     };
   } catch (error) {
-    return local;
+    console.warn('Gemini no pudo interpretar la busqueda. Se usara parser local:', error.message);
+    return { ...local, ia_usada: false, ia_motivo: 'fallback local por error de Gemini' };
   }
 }
 
-module.exports = { parseWithGemini, parseLocal };
+module.exports = { parseWithGemini, parseLocal, aiEstaConfigurada };
