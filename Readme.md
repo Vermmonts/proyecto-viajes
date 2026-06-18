@@ -1,136 +1,151 @@
-# Fly and Lodget - Proyecto de viajes con MySQL, CRUD e IA
+# Fly and Lodget — Ollama + Tavily + MySQL
 
-## Configuración incluida
+Aplicación de viajes con registro e inicio de sesión, búsqueda web mediante Tavily, análisis local con Ollama y CRUD de viajes guardados.
 
-El proyecto mantiene su estructura original:
+## Arquitectura
 
-- `Producto/backend`: servidor Node.js + Express.
-- `Producto/frontend`: interfaz web.
-- `Producto/database`: scripts SQL.
-- `Documentación` y `Gestion`: archivos del proyecto original.
+- **Tavily:** busca información actual en internet y devuelve enlaces.
+- **Ollama:** interpreta la solicitud y compara los resultados localmente, sin costo por consulta de IA.
+- **MySQL:** se utiliza únicamente para usuarios, historial, fuentes, resultados y viajes guardados. No se consulta para encontrar vuelos u hoteles.
 
-Esta versión queda configurada para:
+## Requisitos
 
-- MySQL en puerto `3307`.
-- Base de datos `viajes_app`.
-- Registro e inicio de sesión con usuarios guardados en MySQL.
-- Búsqueda inteligente con IA Gemini usando la clave del archivo `.env`.
-- CRUD funcional de viajes guardados:
-  - Crear: botón `Guardar` desde resultados.
-  - Leer: sección `Mis viajes guardados`.
-  - Actualizar: botón `Editar`, estado y notas.
-  - Eliminar: botón `Quitar`.
+- Node.js 18 o superior.
+- MySQL funcionando en el puerto 3307.
+- Ollama instalado.
+- Una clave gratuita de Tavily.
 
-## Pasos para ejecutar
+## 1. Preparar Ollama
 
-Abre una terminal en:
+Instala Ollama y descarga el modelo:
 
-```bash
-Producto/backend
+```powershell
+ollama pull qwen2.5:7b
 ```
 
-Instala dependencias si aún no están instaladas:
+Comprueba que está disponible:
 
-```bash
-npm install
+```powershell
+ollama list
 ```
 
-Crea/verifica la base de datos y tablas:
+Normalmente Ollama se inicia automáticamente. Si no está activo:
 
-```bash
-npm run setup-db
+```powershell
+ollama serve
 ```
 
-Inicia el proyecto:
+## 2. Configurar Tavily
 
-```bash
-npm start
-```
-
-Luego abre:
+Obtén una clave en Tavily y abre:
 
 ```text
-http://localhost:3000
+Producto/backend/.env
 ```
 
-## Archivo .env
+Pega la clave aquí:
 
-La configuración principal está en `Producto/backend/.env`:
+```env
+TAVILY_API_KEY=pega_aqui_tu_clave_tavily
+```
+
+La configuración completa incluida es:
 
 ```env
 PORT=3000
-DB_HOST=localhost
+DB_HOST=127.0.0.1
 DB_USER=root
 DB_PASSWORD=
 DB_NAME=viajes_app
 DB_PORT=3307
-GEMINI_API_KEY=clave_configurada
-GEMINI_MODEL=gemini-1.5-flash
+JWT_SECRET=cambia_esta_clave_en_produccion
+OLLAMA_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:7b
+TAVILY_API_KEY=pega_aqui_tu_clave_tavily
+TAVILY_SEARCH_DEPTH=advanced
+TAVILY_MAX_RESULTS=10
 ```
 
-Si tu MySQL tiene contraseña, colócala en `DB_PASSWORD`.
+## 3. Iniciar la aplicación
 
-## Rutas de verificación
-
-Base de datos:
-
-```text
-http://localhost:3000/api/debug/db
-```
-
-IA:
-
-```text
-http://localhost:3000/api/debug/ia
-```
-
-La ruta de IA no muestra la clave completa, solo confirma si fue detectada.
-
-## Pruebas rápidas para la presentación
-
-1. Crear cuenta desde `Crear cuenta`.
-2. Buscar, por ejemplo:
-
-```text
-Quiero viajar a Río de Janeiro del 2026-07-10 al 2026-07-17
-```
-
-3. Guardar un resultado.
-4. Ir a `Mis viajes`.
-5. Presionar `Editar`, cambiar estado o nota y guardar.
-6. Presionar `Quitar` para eliminarlo.
-
-## Scripts SQL
-
-También puedes crear la base manualmente ejecutando:
-
-1. `Producto/database/script.sql`
-2. `Producto/database/datos_prueba.sql`
-
-El backend igualmente intenta crear/verificar la base automáticamente al iniciar.
-
-
-## Si registro o login indica "No se pudo completar la operación"
-
-Esta versión incluye migraciones automáticas para bases creadas con scripts anteriores. Ejecuta:
-
-```bash
+```powershell
 cd Producto/backend
 npm install
 npm run setup-db
 npm start
 ```
 
-Luego revisa:
+Abre:
 
 ```text
-http://localhost:3000/api/debug/db
-http://localhost:3000/api/debug/schema
+http://localhost:3000
 ```
 
-La tabla `usuarios` puede tener `password_hash` o venir desde el script antiguo con `password`; el backend acepta ambos formatos y actualiza automáticamente los usuarios antiguos al iniciar sesión.
+## Funcionamiento de una búsqueda
 
+1. Ollama interpreta origen, destino, presupuesto, fechas, pasajeros y preferencias.
+2. El backend construye una consulta web.
+3. Tavily busca resultados actuales y entrega URLs.
+4. Ollama compara los resultados y selecciona la **Mejor opción**.
+5. Si el destino no tiene aeropuerto, propone el aeropuerto práctico más cercano y el traslado final.
+6. El backend guarda fuentes y resultados en MySQL.
 
-## Versión v4
-- Corrección de búsqueda Desde/Hasta: el primer valor se interpreta como origen y el segundo como destino.
-- El botón Inicio limpia resultados, destacados y formulario para volver a una pantalla inicial en blanco.
+Los precios obtenidos en internet son referenciales y deben confirmarse en el sitio del proveedor.
+
+## Verificación
+
+- Base de datos: `http://localhost:3000/api/debug/db`
+- Estructura: `http://localhost:3000/api/debug/schema`
+- Ollama y Tavily: `http://localhost:3000/api/debug/ia`
+
+## Solución de problemas
+
+### Ollama no responde
+
+```powershell
+ollama serve
+ollama list
+```
+
+Si falta el modelo:
+
+```powershell
+ollama pull qwen2.5:7b
+```
+
+### El computador tiene poca memoria
+
+Usa un modelo más pequeño:
+
+```powershell
+ollama pull llama3.2:3b
+```
+
+Y cambia:
+
+```env
+OLLAMA_MODEL=llama3.2:3b
+```
+
+### Tavily rechaza la consulta
+
+Revisa que `TAVILY_API_KEY` sea correcta y que el plan gratuito tenga créditos disponibles.
+
+## Seguridad
+
+`.env` y `node_modules` están ignorados por Git. No subas la clave de Tavily a GitHub.
+
+## Estabilidad de búsquedas prolongadas
+
+La conexión local utiliza los módulos HTTP nativos de Node.js para evitar el error `UND_ERR_HEADERS_TIMEOUT` que puede producir el `fetch` integrado durante respuestas largas. La configuración recomendada es:
+
+```env
+OLLAMA_TIMEOUT_MS=900000
+OLLAMA_NUM_CTX=4096
+OLLAMA_KEEP_ALIVE=15m
+OLLAMA_THINK=false
+TAVILY_SEARCH_DEPTH=basic
+TAVILY_MAX_RESULTS=6
+```
+
+Si el análisis local demora demasiado, la aplicación mantiene la búsqueda web y muestra una comparación básica basada en las fuentes encontradas, en lugar de interrumpir toda la operación.

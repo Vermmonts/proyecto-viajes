@@ -3,133 +3,229 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fly and Lodget</title>
+  <meta name="description" content="Compara vuelos, alojamientos y traslados para encontrar una opción de viaje conveniente." />
+  <title>Flyandlodget | Tu viaje, todo en un solo lugar</title>
+  <link rel="icon" type="image/png" href="assets/flyandlodget-logo.png" />
   <link rel="stylesheet" href="css/styles.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark">✈</span>
-      <span>Fly and Lodget</span>
-    </div>
-    <nav>
-      <a href="#inicio">Inicio</a>
-      <a href="#buscar">Buscar</a>
-      <a href="#mis-viajes">Mis viajes</a>
-    </nav>
-    <div class="session-actions" id="sessionActions">
-      <button class="ghost" data-open="loginModal">Ingresar</button>
-      <button class="primary small" data-open="registroModal">Crear cuenta</button>
-    </div>
-    <div class="user-pill hidden" id="userPill">
-      <span id="userName"></span>
-      <button class="ghost small" id="logoutBtn">Salir</button>
+    <div class="topbar-inner">
+      <a class="brand" href="#inicio" aria-label="Flyandlodget - Inicio">
+        <span class="brand-logo-crop" aria-hidden="true">
+          <img src="assets/flyandlodget-logo.png" alt="" />
+        </span>
+        <span class="brand-name" aria-label="Flyandlodget"><span>Flyand</span><span class="brand-accent">lodget</span></span>
+      </a>
+
+      <nav class="main-nav" aria-label="Navegación principal">
+        <a href="#inicio">Inicio</a>
+        <a href="#buscar">Buscar</a>
+        <a href="#mis-viajes">Mis reservas</a>
+      </nav>
+
+      <div class="session-actions" id="sessionActions">
+        <button class="btn btn-outline-light" data-open="loginModal">Ingresar</button>
+        <button class="btn btn-light" data-open="registroModal">Crear cuenta</button>
+      </div>
+
+      <div class="user-pill hidden" id="userPill">
+        <span class="user-avatar" aria-hidden="true">●</span>
+        <span id="userName"></span>
+        <button class="btn btn-outline-light btn-small" id="logoutBtn">Salir</button>
+      </div>
     </div>
   </header>
 
   <main>
     <section class="hero" id="inicio">
-      <div class="hero-overlay"></div>
-      <div class="hero-content">
-        <p class="eyebrow">Tu próximo destino comienza aquí</p>
-        <h1>Encuentra vuelos y alojamientos para tu viaje ideal</h1>
-        <p class="hero-copy">Busca por destino, fechas de ida y vuelta, compara opciones y guarda tus favoritos.</p>
-        <div class="hero-card" id="buscar">
-          <form id="searchForm" class="search-grid">
-            <div class="field wide">
-              <label>¿Qué viaje quieres realizar?</label>
-              <input id="texto" placeholder="Ej: Quiero viajar a Río de Janeiro del 2026-07-10 al 2026-07-17" />
+      <div class="hero-inner">
+        <div class="hero-copy-wrap">
+          <p class="kicker">Compara, elige y guarda</p>
+          <h1>Encuentra una mejor forma de viajar</h1>
+          <p class="hero-copy">Revisa alternativas de vuelo, alojamiento y traslado en una sola búsqueda.</p>
+        </div>
+
+        <div class="search-shell" id="buscar">
+          <form id="searchForm" class="search-form">
+            <div class="field field-query">
+              <label for="texto">Describe tu viaje</label>
+              <input id="texto" placeholder="Ej: Viaje a Lima por 4 noches con un presupuesto de $500.000" autocomplete="off" />
             </div>
-            <div class="field">
-              <label>Desde</label>
-              <input id="origen" placeholder="Santiago, Concepción, La Serena..." />
+
+            <div class="field field-location">
+              <label for="origen">Origen</label>
+              <input id="origen" placeholder="¿Desde dónde sales?" autocomplete="off" />
             </div>
-            <div class="field">
-              <label>Hasta</label>
-              <input id="destino" placeholder="Buenos Aires, Lima, Cancún..." />
+
+            <div class="field field-location">
+              <label for="destino">Destino</label>
+              <input id="destino" placeholder="¿A dónde quieres ir?" autocomplete="off" />
             </div>
-            <div class="field">
-              <label>Ida</label>
+
+            <div class="field field-date">
+              <label for="fechaIda">Ida</label>
               <input id="fechaIda" type="date" />
             </div>
-            <div class="field">
-              <label>Vuelta</label>
+
+            <div class="field field-date">
+              <label for="fechaVuelta">Vuelta</label>
               <input id="fechaVuelta" type="date" />
             </div>
-            <div class="field">
-              <label>Personas</label>
+
+            <div class="field field-guests">
+              <label for="personas">Viajeros</label>
               <input id="personas" type="number" min="1" value="1" />
             </div>
-            <button class="primary search-btn" type="submit">Buscar viaje</button>
+
+            <button class="btn btn-search" type="submit">
+              <span>Buscar</span>
+            </button>
           </form>
+          <p class="search-note">Comparamos alternativas disponibles y te presentamos las opciones más convenientes.</p>
         </div>
       </div>
     </section>
 
-    <section class="content-wrap">
+    <section class="benefits-bar" aria-label="Beneficios del servicio">
+      <div class="benefit"><span class="benefit-icon">✓</span><div><strong>Comparación centralizada</strong><small>Vuelos, estadía y traslados</small></div></div>
+      <div class="benefit"><span class="benefit-icon">↗</span><div><strong>Fuentes verificables</strong><small>Acceso directo a proveedores</small></div></div>
+      <div class="benefit"><span class="benefit-icon">★</span><div><strong>Opciones priorizadas</strong><small>Según precio y conveniencia</small></div></div>
+    </section>
+
+    <section class="content-wrap results-section">
       <div class="section-title">
         <div>
-          <p class="eyebrow teal">Resultados</p>
-          <h2>Opciones disponibles</h2>
+          <p class="kicker dark">Resultados de búsqueda</p>
+          <h2>Alternativas para tu viaje</h2>
         </div>
-        <span id="searchStatus" class="status-pill">Realiza una búsqueda</span>
+        <span id="searchStatus" class="status-pill">Ingresa los datos de tu viaje</span>
       </div>
 
       <div class="featured-grid" id="featuredGrid"></div>
+
+      <section class="ai-plan hidden" id="aiPlanPanel">
+        <div class="subsection-title">
+          <div>
+            <p class="section-label">Selección destacada</p>
+            <h3>Opciones ajustadas a tu presupuesto</h3>
+          </div>
+          <p class="muted" id="aiPlanSummary"></p>
+        </div>
+        <div class="plan-grid" id="aiPlanGrid"></div>
+      </section>
+
+      <section class="web-results hidden" id="webResultsPanel">
+        <div class="subsection-title">
+          <div>
+            <p class="section-label">Comparación actualizada</p>
+            <h3>Mejores alternativas encontradas</h3>
+          </div>
+          <p class="muted">Los precios y la disponibilidad deben confirmarse directamente con cada proveedor.</p>
+        </div>
+        <div id="webAnswer" class="web-answer"></div>
+        <div class="source-list" id="webSources"></div>
+      </section>
+
+      <div class="selection-panel hidden" id="selectionPanel">
+        <div>
+          <p class="section-label">Tu selección</p>
+          <h3>Guarda esta alternativa para revisarla más tarde</h3>
+          <p class="muted"><span id="selectedVueloText">Ninguna opción seleccionada</span></p>
+          <p class="muted hidden"><span id="selectedHotelText"></span></p>
+        </div>
+        <button class="btn btn-primary" id="saveSelectedTrip" type="button">Guardar en mis reservas</button>
+      </div>
+
+      <div class="split-results hidden" id="localResultsSection">
+        <section class="result-column">
+          <div class="subsection-title">
+            <h3>Vuelos disponibles</h3>
+            <p class="muted">Opciones según origen, destino y fechas.</p>
+          </div>
+          <div class="options-list" id="vuelosGrid"></div>
+        </section>
+
+        <section class="result-column">
+          <div class="subsection-title">
+            <h3>Alojamientos disponibles</h3>
+            <p class="muted">Alternativas de estadía en el destino.</p>
+          </div>
+          <div class="options-list" id="hotelesGrid"></div>
+        </section>
+      </div>
+
       <div class="results-grid" id="resultsGrid"></div>
     </section>
 
     <section class="content-wrap dashboard" id="mis-viajes">
       <div class="panel-header">
         <div>
-          <p class="eyebrow teal">Panel de usuario</p>
-          <h2>Mis viajes guardados</h2>
+          <p class="kicker dark">Área personal</p>
+          <h2>Mis reservas guardadas</h2>
         </div>
-        <button class="secondary" id="refreshTrips">Actualizar</button>
+        <button class="btn btn-secondary" id="refreshTrips">Actualizar</button>
       </div>
       <div class="saved-list" id="savedTrips">
-        <p class="muted">Inicia sesión para ver tus viajes guardados.</p>
+        <div class="empty-state">
+          <h3>Inicia sesión para ver tus reservas</h3>
+          <p>Guarda las alternativas que te interesen y vuelve a revisarlas cuando quieras.</p>
+        </div>
       </div>
     </section>
   </main>
 
-  <div class="modal" id="loginModal">
+  <footer class="site-footer">
+    <div class="footer-brand">
+      <span class="footer-logo-crop" aria-hidden="true"><img src="assets/flyandlodget-logo.png" alt="" /></span>
+      <div>
+        <strong>Flyandlodget</strong>
+        <p>Tu viaje. Todo en un solo lugar.</p>
+      </div>
+    </div>
+    <small>Los precios y condiciones pertenecen a proveedores externos y pueden cambiar.</small>
+  </footer>
+
+  <div class="modal" id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <div class="modal-card">
-      <button class="close" data-close>×</button>
-      <h2>Iniciar sesión</h2>
-      <p class="muted">Ingresa a tu cuenta para guardar tus viajes.</p>
+      <button class="close" data-close aria-label="Cerrar">×</button>
+      <p class="section-label">Acceso de usuarios</p>
+      <h2 id="loginTitle">Iniciar sesión</h2>
+      <p class="muted">Accede para guardar y administrar tus alternativas de viaje.</p>
       <form id="loginForm" class="auth-form">
-        <label>Correo</label>
-        <input type="email" name="email" required />
+        <label>Correo electrónico</label>
+        <input type="email" name="email" required autocomplete="email" />
         <label>Contraseña</label>
-        <input type="password" name="password" required />
-        <button class="primary" type="submit">Ingresar</button>
+        <input type="password" name="password" required autocomplete="current-password" />
+        <button class="btn btn-primary" type="submit">Ingresar</button>
       </form>
     </div>
   </div>
 
-  <div class="modal" id="registroModal">
+  <div class="modal" id="registroModal" role="dialog" aria-modal="true" aria-labelledby="registerTitle">
     <div class="modal-card">
-      <button class="close" data-close>×</button>
-      <h2>Crear cuenta</h2>
-      <p class="muted">Registra tus datos para guardar tus próximas escapadas.</p>
+      <button class="close" data-close aria-label="Cerrar">×</button>
+      <p class="section-label">Nueva cuenta</p>
+      <h2 id="registerTitle">Crear cuenta</h2>
+      <p class="muted">Regístrate para guardar tus búsquedas y gestionar tus reservas.</p>
       <form id="registroForm" class="auth-form">
         <label>Nombre</label>
-        <input name="nombre" required />
-        <label>Correo</label>
-        <input type="email" name="email" required />
+        <input name="nombre" required autocomplete="name" />
+        <label>Correo electrónico</label>
+        <input type="email" name="email" required autocomplete="email" />
         <label>Contraseña</label>
-        <input type="password" name="password" minlength="4" required />
-        <button class="primary" type="submit">Crear cuenta</button>
+        <input type="password" name="password" minlength="4" required autocomplete="new-password" />
+        <button class="btn btn-primary" type="submit">Crear cuenta</button>
       </form>
     </div>
   </div>
 
-  <div class="modal" id="editTripModal">
+  <div class="modal" id="editTripModal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
     <div class="modal-card">
-      <button class="close" data-close>×</button>
-      <h2>Editar viaje</h2>
-      <p class="muted" id="editTripTitle">Actualiza el estado o la nota de tu viaje.</p>
+      <button class="close" data-close aria-label="Cerrar">×</button>
+      <p class="section-label">Gestión de reserva</p>
+      <h2 id="editTitle">Editar viaje</h2>
+      <p class="muted" id="editTripTitle">Actualiza el estado o las notas de tu viaje.</p>
       <form id="editTripForm" class="auth-form">
         <input type="hidden" id="editTripId" />
         <input type="hidden" id="editVueloId" />
@@ -143,13 +239,13 @@
           <option value="cancelado">Cancelado</option>
         </select>
         <label>Notas</label>
-        <textarea id="editNotas" maxlength="500" placeholder="Ej: Comprar equipaje, revisar hotel o confirmar traslado."></textarea>
-        <button class="primary" type="submit">Guardar cambios</button>
+        <textarea id="editNotas" maxlength="500" placeholder="Ej: Revisar equipaje, traslado o condiciones del alojamiento."></textarea>
+        <button class="btn btn-primary" type="submit">Guardar cambios</button>
       </form>
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="js/app.js"></script>
 </body>
 </html>

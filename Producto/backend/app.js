@@ -25,10 +25,15 @@ app.use('/api/mis-viajes', tripRoutes);
 app.get('/api/debug/db', async (req, res) => {
   try {
     const pool = require('./db');
-    const [[vuelos]] = await pool.query('SELECT COUNT(*) AS total FROM vuelos');
-    const [[hoteles]] = await pool.query('SELECT COUNT(*) AS total FROM hoteles');
-    const [muestra] = await pool.query('SELECT origen, destino, fecha_salida, fecha_regreso, precio FROM vuelos ORDER BY id DESC LIMIT 5');
-    res.json({ ok: true, db: process.env.DB_NAME, port: process.env.DB_PORT || 3307, vuelos: vuelos.total, hoteles: hoteles.total, muestra });
+    const [[usuarios]] = await pool.query('SELECT COUNT(*) AS total FROM usuarios');
+    const [[fuentes]] = await pool.query('SELECT COUNT(*) AS total FROM fuentes_web');
+    const [[resultados]] = await pool.query('SELECT COUNT(*) AS total FROM resultados_web_viajes');
+    const [[viajes]] = await pool.query('SELECT COUNT(*) AS total FROM viajes_web_guardados');
+    res.json({
+      ok: true, db: process.env.DB_NAME, port: process.env.DB_PORT || 3307,
+      usuarios: usuarios.total, fuentes_web: fuentes.total, resultados_web: resultados.total, viajes_guardados: viajes.total,
+      nota: 'MySQL se usa solo para almacenamiento; la búsqueda se realiza con Tavily y Ollama.'
+    });
   } catch (error) {
     res.status(500).json({ ok: false, message: error.message, db: process.env.DB_NAME, port: process.env.DB_PORT || 3307 });
   }
@@ -55,18 +60,32 @@ app.get('/api/debug/schema', async (req, res) => {
   }
 });
 
-app.get('/api/debug/ia', (req, res) => {
+app.get('/api/debug/ia', async (req, res) => {
   const { aiEstaConfigurada } = require('./services/searchParser');
-  const key = process.env.GEMINI_API_KEY || '';
+  const tavily = process.env.TAVILY_API_KEY || '';
+  const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+  const modelo = process.env.OLLAMA_MODEL || 'qwen2.5:7b';
+  let ollamaDisponible = false;
+  let detalleOllama = '';
+  try {
+    const response = await fetch(`${ollamaUrl.replace(/\/$/, '')}/api/tags`);
+    ollamaDisponible = response.ok;
+    if (!response.ok) detalleOllama = `HTTP ${response.status}`;
+  } catch (error) {
+    detalleOllama = error.message;
+  }
   res.json({
     ok: true,
     ia_configurada: aiEstaConfigurada(),
-    proveedor: 'Google Gemini',
-    modelo: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
-    proyecto: process.env.GEMINI_PROJECT_ID || null,
-    numero_proyecto: process.env.GEMINI_PROJECT_NUMBER || null,
-    key_detectada: key ? `${key.slice(0, 6)}...${key.slice(-4)}` : null,
-    nota: aiEstaConfigurada() ? 'GEMINI_API_KEY detectada en .env.' : 'Falta GEMINI_API_KEY en .env.'
+    proveedor: 'Tavily + Ollama',
+    modelo,
+    ollama_url: ollamaUrl,
+    ollama_disponible: ollamaDisponible,
+    detalle_ollama: detalleOllama || null,
+    tavily_key_detectada: tavily ? `${tavily.slice(0, 5)}...${tavily.slice(-4)}` : null,
+    nota: aiEstaConfigurada()
+      ? 'Configuración detectada. Ollama debe estar ejecutándose y el modelo descargado.'
+      : 'Configura TAVILY_API_KEY, OLLAMA_URL y OLLAMA_MODEL en .env.'
   });
 });
 

@@ -87,6 +87,58 @@ async function ensureMigrations(connection) {
     }
   }
 
+  await connection.query(`CREATE TABLE IF NOT EXISTS fuentes_web (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(255) NOT NULL,
+    url TEXT NOT NULL,
+    dominio VARCHAR(180) NULL,
+    tipo VARCHAR(40) DEFAULT 'viaje',
+    consulta_usuario TEXT NULL,
+    contenido_resumen TEXT NULL,
+    fecha_consulta TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+  await connection.query(`CREATE TABLE IF NOT EXISTS resultados_web_viajes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fuente_id INT NULL,
+    origen VARCHAR(120) NULL,
+    destino VARCHAR(120) NULL,
+    tipo VARCHAR(40) DEFAULT 'referencia',
+    nombre VARCHAR(255) NULL,
+    precio_estimado DECIMAL(14,2) NULL,
+    moneda VARCHAR(10) DEFAULT 'CLP',
+    url TEXT NOT NULL,
+    descripcion TEXT NULL,
+    fecha_consulta TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_web_destino (destino),
+    CONSTRAINT fk_resultado_fuente FOREIGN KEY (fuente_id) REFERENCES fuentes_web(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
+
+  await connection.query(`CREATE TABLE IF NOT EXISTS viajes_web_guardados (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    titulo VARCHAR(255) NOT NULL,
+    origen VARCHAR(120) NULL,
+    destino VARCHAR(120) NULL,
+    aeropuerto_llegada VARCHAR(180) NULL,
+    fechas VARCHAR(180) NULL,
+    personas INT DEFAULT 1,
+    proveedor_vuelo VARCHAR(180) NULL,
+    alojamiento VARCHAR(255) NULL,
+    traslado_local TEXT NULL,
+    total_estimado DECIMAL(14,2) NULL,
+    moneda VARCHAR(10) DEFAULT 'CLP',
+    url_reserva TEXT NULL,
+    fuente_json JSON NULL,
+    estado VARCHAR(30) DEFAULT 'planificado',
+    notas VARCHAR(500) NULL,
+    fecha_guardado TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_viajes_web_usuario (usuario_id),
+    CONSTRAINT fk_viajes_web_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+
   if (await tableExists(connection, 'viajes_guardados')) {
     await addColumnIfMissing(connection, 'viajes_guardados', 'estado', "estado VARCHAR(30) DEFAULT 'planificado'");
     await addColumnIfMissing(connection, 'viajes_guardados', 'notas', 'notas VARCHAR(500) NULL');
@@ -109,15 +161,7 @@ async function ensureDatabase() {
     await runSqlFile(connection, 'script.sql');
     await ensureMigrations(connection);
 
-    const [[vuelos]] = await connection.query(`SELECT COUNT(*) AS total FROM \`${DB_NAME}\`.vuelos`);
-    const [[hoteles]] = await connection.query(`SELECT COUNT(*) AS total FROM \`${DB_NAME}\`.hoteles`);
-
-    if (Number(vuelos.total) === 0 || Number(hoteles.total) === 0) {
-      await runSqlFile(connection, 'datos_prueba.sql');
-      console.log('Base de datos creada y datos de prueba cargados.');
-    } else {
-      console.log('Base de datos verificada. Tablas, migraciones y datos existentes conservados.');
-    }
+    console.log('Base de datos verificada. Se utilizará únicamente para usuarios, historial, fuentes y viajes guardados; las búsquedas se realizan siempre en internet mediante Tavily y se analizan localmente con Ollama.');
   } finally {
     await connection.end();
   }

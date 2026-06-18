@@ -1,7 +1,7 @@
 {
   "name": "fly-and-lodget-backend",
-  "version": "2.0.0",
-  "description": "Sistema de viajes con login, busqueda inteligente y base de datos MySQL",
+  "version": "3.0.0",
+  "description": "Sistema de viajes con Ollama local, búsqueda web Tavily y MySQL para almacenamiento",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -9,7 +9,6 @@
     "setup-db": "node initDatabase.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
