@@ -1,7 +1,7 @@
 {
   "name": "fly-and-lodget-backend",
-  "version": "3.0.0",
-  "description": "Sistema de viajes con Ollama local, búsqueda web Tavily y MySQL para almacenamiento",
+  "version": "3.2.0",
+  "description": "Sistema de viajes con búsqueda web de vuelos y alojamientos, validación segura de usuarios y MySQL para almacenamiento",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

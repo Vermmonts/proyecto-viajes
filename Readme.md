@@ -84,11 +84,14 @@ http://localhost:3000
 ## Funcionamiento de una búsqueda
 
 1. Ollama interpreta origen, destino, presupuesto, fechas, pasajeros y preferencias.
-2. El backend construye una consulta web.
-3. Tavily busca resultados actuales y entrega URLs.
-4. Ollama compara los resultados y selecciona la **Mejor opción**.
-5. Si el destino no tiene aeropuerto, propone el aeropuerto práctico más cercano y el traslado final.
-6. El backend guarda fuentes y resultados en MySQL.
+2. El backend construye consultas web separadas para vuelos y alojamientos.
+3. Tavily busca resultados actuales para cada categoría y entrega URLs verificables.
+4. La búsqueda solo continúa cuando existen referencias tanto de vuelos como de alojamientos.
+5. Ollama combina ambas categorías, compara precio, escalas, ubicación, valoración y condiciones, y selecciona la **Mejor opción**.
+6. Si el destino no tiene aeropuerto, propone el aeropuerto comercial más práctico y explica por qué conviene para la ruta.
+7. El backend guarda por separado las fuentes de vuelos y alojamientos en MySQL.
+
+La búsqueda se limita a vuelos y alojamientos; no consulta ni muestra traslados locales.
 
 Los precios obtenidos en internet son referenciales y deben confirmarse en el sitio del proveedor.
 
@@ -149,3 +152,24 @@ TAVILY_MAX_RESULTS=6
 ```
 
 Si el análisis local demora demasiado, la aplicación mantiene la búsqueda web y muestra una comparación básica basada en las fuentes encontradas, en lugar de interrumpir toda la operación.
+
+## Validaciones de usuarios
+
+El registro valida tanto en el navegador como en el backend:
+
+- Nombre obligatorio, entre 2 y 100 caracteres.
+- Correo con formato válido y normalizado en minúsculas.
+- No se permiten dos cuentas con el mismo correo, incluso si cambia el uso de mayúsculas.
+- Contraseña entre 8 y 72 caracteres.
+- La contraseña debe incluir mayúscula, minúscula, número y símbolo, sin espacios.
+- Confirmación de contraseña obligatoria.
+- Las contraseñas se guardan cifradas con bcrypt.
+- La base de datos mantiene un índice único para el correo cuando no existen duplicados anteriores.
+
+
+## Versión 16: búsqueda web robusta
+
+- Las consultas de vuelos y alojamientos se realizan por separado.
+- Si una consulta no entrega resultados, el sistema realiza un segundo intento con una búsqueda más breve.
+- Los errores de Tavily ahora se convierten a mensajes legibles; ya no se muestran textos como `[object Object]`.
+- Los errores de clave, cuota y validación se identifican de forma específica.

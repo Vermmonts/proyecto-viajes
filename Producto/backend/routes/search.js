@@ -39,7 +39,7 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('ERROR BUSQUEDA WEB:', error);
     const mensaje = error.message || 'No se pudo completar la búsqueda';
-    const status = /TAVILY_API_KEY|OLLAMA|configura/i.test(mensaje) ? 503 : 500;
+    const status = Number(error.httpStatus) || (/TAVILY_API_KEY|OLLAMA|configura/i.test(mensaje) ? 503 : 500);
     res.status(status).json({ ok: false, message: `No se pudo buscar la mejor opción en internet: ${mensaje}` });
   }
 });

@@ -53,7 +53,12 @@ async function request(url, options = {}) {
     throw new Error('No se pudo conectar con el backend. Revisa que hayas iniciado el servidor con npm start en Producto/backend.');
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || data.mensaje || 'No se pudo completar la operación.');
+  if (!res.ok) {
+    const error = new Error(data.message || data.mensaje || 'No se pudo completar la operación.');
+    error.status = res.status;
+    error.fields = data.errors || {};
+    throw error;
+  }
   return data;
 }
 
@@ -109,32 +114,201 @@ $('logoutBtn').addEventListener('click', () => {
   toast('Sesión cerrada.');
 });
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  if (!email || email.length > 150 || /\s/.test(email)) return false;
+  const parts = email.split('@');
+  if (parts.length !== 2) return false;
+  const [local, domain] = parts;
+  if (!local || !domain || local.startsWith('.') || local.endsWith('.') || local.includes('..')) return false;
+  const labels = domain.split('.');
+  return labels.length >= 2 && labels.every(label => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label));
+}
+
+function fieldMessage(key) {
+  return document.querySelector(`[data-error-for="${key}"]`);
+}
+
+function setFieldError(inputId, messageKey, message = '') {
+  const input = $(inputId);
+  const messageEl = fieldMessage(messageKey);
+  if (input) {
+    input.classList.toggle('input-invalid', Boolean(message));
+    input.setAttribute('aria-invalid', message ? 'true' : 'false');
+  }
+  if (messageEl) messageEl.textContent = message;
+}
+
+function clearRegistrationErrors() {
+  setFieldError('registroNombre', 'registro-nombre');
+  setFieldError('registroEmail', 'registro-email');
+  setFieldError('registroPassword', 'registro-password');
+  setFieldError('registroConfirmPassword', 'registro-confirm-password');
+}
+
+function clearLoginErrors() {
+  setFieldError('loginEmail', 'login-email');
+  setFieldError('loginPassword', 'login-password');
+}
+
+function setFormLoading(form, loading, loadingText) {
+  const button = form.querySelector('button[type="submit"]');
+  if (!button) return;
+  if (!button.dataset.defaultText) button.dataset.defaultText = button.textContent;
+  button.disabled = loading;
+  button.textContent = loading ? loadingText : button.dataset.defaultText;
+}
+
+function passwordChecks(password) {
+  return {
+    length: password.length >= 8 && password.length <= 72,
+    lower: /[a-záéíóúüñ]/.test(password),
+    upper: /[A-ZÁÉÍÓÚÜÑ]/.test(password),
+    number: /\d/.test(password),
+    symbol: /[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]/.test(password) && !/\s/.test(password)
+  };
+}
+
+function updatePasswordRules() {
+  const password = $('registroPassword')?.value || '';
+  const checks = passwordChecks(password);
+  document.querySelectorAll('#passwordRules [data-rule]').forEach(item => {
+    item.classList.toggle('valid', Boolean(checks[item.dataset.rule]));
+  });
+  return checks;
+}
+
+function validateRegistrationForm(form) {
+  clearRegistrationErrors();
+  const values = Object.fromEntries(new FormData(form).entries());
+  values.nombre = String(values.nombre || '').trim().replace(/\s+/g, ' ');
+  values.email = normalizeEmail(values.email);
+  values.password = String(values.password || '');
+  values.confirmPassword = String(values.confirmPassword || '');
+  let valid = true;
+
+  if (values.nombre.length < 2) {
+    setFieldError('registroNombre', 'registro-nombre', 'Ingresa un nombre de al menos 2 caracteres.');
+    valid = false;
+  } else if (values.nombre.length > 100) {
+    setFieldError('registroNombre', 'registro-nombre', 'El nombre no puede superar los 100 caracteres.');
+    valid = false;
+  } else if (!/^[\p{L}\p{M}.'’\- ]+$/u.test(values.nombre)) {
+    setFieldError('registroNombre', 'registro-nombre', 'Usa solamente letras, espacios, puntos, apóstrofes o guiones.');
+    valid = false;
+  }
+
+  if (!isValidEmail(values.email)) {
+    setFieldError('registroEmail', 'registro-email', 'Ingresa un correo válido, por ejemplo nombre@dominio.cl.');
+    valid = false;
+  }
+
+  const checks = updatePasswordRules();
+  if (!Object.values(checks).every(Boolean)) {
+    setFieldError('registroPassword', 'registro-password', 'La contraseña debe cumplir todos los requisitos indicados.');
+    valid = false;
+  }
+
+  if (values.password !== values.confirmPassword) {
+    setFieldError('registroConfirmPassword', 'registro-confirm-password', 'Las contraseñas no coinciden.');
+    valid = false;
+  }
+
+  return { valid, values };
+}
+
+function applyBackendRegistrationErrors(errors = {}) {
+  if (errors.nombre) setFieldError('registroNombre', 'registro-nombre', errors.nombre);
+  if (errors.email) setFieldError('registroEmail', 'registro-email', errors.email);
+  if (errors.password) setFieldError('registroPassword', 'registro-password', errors.password);
+  if (errors.confirmPassword) setFieldError('registroConfirmPassword', 'registro-confirm-password', errors.confirmPassword);
+}
+
+$('registroPassword')?.addEventListener('input', () => {
+  updatePasswordRules();
+  setFieldError('registroPassword', 'registro-password');
+});
+$('registroConfirmPassword')?.addEventListener('input', () => setFieldError('registroConfirmPassword', 'registro-confirm-password'));
+$('registroNombre')?.addEventListener('input', () => setFieldError('registroNombre', 'registro-nombre'));
+$('registroEmail')?.addEventListener('input', () => setFieldError('registroEmail', 'registro-email'));
+$('loginEmail')?.addEventListener('input', () => setFieldError('loginEmail', 'login-email'));
+$('loginPassword')?.addEventListener('input', () => setFieldError('loginPassword', 'login-password'));
+
 $('registroForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const form = new FormData(e.target);
+  const form = e.target;
+  const { valid, values } = validateRegistrationForm(form);
+
+  if (!valid) {
+    form.querySelector('.input-invalid')?.focus();
+    toast('Revisa los datos del formulario.');
+    return;
+  }
+
+  setFormLoading(form, true, 'Creando cuenta...');
   try {
     const data = await request('/api/auth/registro', {
       method: 'POST',
-      body: JSON.stringify(Object.fromEntries(form.entries()))
+      body: JSON.stringify(values)
     });
     saveSession(data);
+    form.reset();
+    updatePasswordRules();
+    clearRegistrationErrors();
     closeModals();
     toast('Cuenta creada correctamente.');
-  } catch (err) { toast(err.message); }
+  } catch (err) {
+    applyBackendRegistrationErrors(err.fields);
+    form.querySelector('.input-invalid')?.focus();
+    toast(err.message);
+  } finally {
+    setFormLoading(form, false);
+  }
 });
 
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const form = new FormData(e.target);
+  const form = e.target;
+  clearLoginErrors();
+  const values = Object.fromEntries(new FormData(form).entries());
+  values.email = normalizeEmail(values.email);
+  values.password = String(values.password || '');
+  let valid = true;
+
+  if (!isValidEmail(values.email)) {
+    setFieldError('loginEmail', 'login-email', 'Ingresa un correo electrónico válido.');
+    valid = false;
+  }
+  if (!values.password) {
+    setFieldError('loginPassword', 'login-password', 'Ingresa tu contraseña.');
+    valid = false;
+  }
+  if (!valid) {
+    form.querySelector('.input-invalid')?.focus();
+    return;
+  }
+
+  setFormLoading(form, true, 'Ingresando...');
   try {
     const data = await request('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify(Object.fromEntries(form.entries()))
+      body: JSON.stringify(values)
     });
     saveSession(data);
+    form.reset();
+    clearLoginErrors();
     closeModals();
     toast('Bienvenido de vuelta.');
-  } catch (err) { toast(err.message); }
+  } catch (err) {
+    if (err.fields?.email) setFieldError('loginEmail', 'login-email', err.fields.email);
+    if (err.fields?.password) setFieldError('loginPassword', 'login-password', err.fields.password);
+    toast(err.message);
+  } finally {
+    setFormLoading(form, false);
+  }
 });
 
 function saveSession(data) {
@@ -162,7 +336,7 @@ $('searchForm').addEventListener('submit', async (e) => {
     return;
   }
 
-  $('searchStatus').textContent = 'Comparando alternativas disponibles...';
+  $('searchStatus').textContent = 'Buscando vuelos y alojamientos disponibles...';
   $('featuredGrid').innerHTML = '';
   $('resultsGrid').innerHTML = '';
   $('vuelosGrid').innerHTML = '';
@@ -178,7 +352,7 @@ $('searchForm').addEventListener('submit', async (e) => {
     state.hoteles = [];
     state.lastResults = [];
     $('searchStatus').textContent = data.mejor_opcion
-      ? 'Mejor alternativa encontrada'
+      ? 'Vuelo y alojamiento encontrados'
       : 'Búsqueda completada';
     renderWebResults(data.web, data);
   } catch (err) {
@@ -244,23 +418,50 @@ function renderWebResults(web = {}, data = {}) {
     if (!opcion) return '';
     const vuelo = opcion.vuelo || {};
     const hotel = opcion.alojamiento || {};
-    const traslado = opcion.traslado_local || {};
     const total = opcion.total_estimado != null ? money(opcion.total_estimado) : 'Precio por confirmar';
-    const dentro = opcion.dentro_presupuesto === true ? 'Dentro del presupuesto' : (opcion.dentro_presupuesto === false ? 'Supera el presupuesto' : 'Presupuesto no indicado');
-    const url = opcion.url_reserva || vuelo.url || hotel.url || traslado.url || fuentes[0]?.url || '';
+    const dentro = opcion.dentro_presupuesto === true
+      ? 'Dentro del presupuesto'
+      : (opcion.dentro_presupuesto === false ? 'Supera el presupuesto' : 'Presupuesto no indicado');
+    const vueloUrl = vuelo.url || '';
+    const hotelUrl = hotel.url || '';
+    const alojamientoCompleto = Boolean(hotel.nombre || hotel.ubicacion || hotelUrl);
+
     return `
       <article class="plan-card ${principal ? 'within-budget' : ''}">
         <span class="badge">${principal ? 'Mejor opción' : `Alternativa ${index + 1}`}</span>
         <h3>${escapeHtml(opcion.origen || '')} → ${escapeHtml(opcion.destino_final || '')}</h3>
         <p class="muted"><strong>Aeropuerto de llegada:</strong> ${escapeHtml(opcion.aeropuerto_llegada || 'Por confirmar')}</p>
-        <p class="muted"><strong>Vuelo:</strong> ${escapeHtml(vuelo.proveedor || 'Proveedor por confirmar')} · ${escapeHtml(vuelo.ruta || '')} · ${vuelo.escalas ?? 'N/D'} escala(s)</p>
-        <p class="muted"><strong>Alojamiento:</strong> ${escapeHtml(hotel.nombre || 'Por confirmar')} · ${escapeHtml(hotel.ubicacion || '')}</p>
-        ${traslado.descripcion ? `<p class="muted"><strong>Traslado final:</strong> ${escapeHtml(traslado.descripcion)}</p>` : ''}
+
+        <div class="travel-component flight-component">
+          <div class="component-heading">
+            <span class="component-icon" aria-hidden="true">✈</span>
+            <div>
+              <small>Vuelo</small>
+              <strong>${escapeHtml(vuelo.proveedor || 'Proveedor por confirmar')}</strong>
+            </div>
+          </div>
+          <p>${escapeHtml(vuelo.ruta || `${opcion.origen || ''} - ${opcion.destino_final || ''}`)}</p>
+          <p class="muted">${vuelo.escalas ?? 'N/D'} escala(s) · ${vuelo.precio != null ? money(vuelo.precio) : 'Precio por confirmar'}</p>
+          ${vueloUrl ? `<a class="component-link" href="${escapeHtml(vueloUrl)}" target="_blank" rel="noopener noreferrer">Revisar vuelo ↗</a>` : ''}
+        </div>
+
+        <div class="travel-component lodging-component">
+          <div class="component-heading">
+            <span class="component-icon" aria-hidden="true">⌂</span>
+            <div>
+              <small>Alojamiento</small>
+              <strong>${escapeHtml(hotel.nombre || 'Alojamiento por confirmar')}</strong>
+            </div>
+          </div>
+          <p>${escapeHtml(hotel.ubicacion || opcion.destino_final || '')}</p>
+          <p class="muted">${hotel.noches || 'N/D'} noche(s) · ${hotel.precio_total != null ? money(hotel.precio_total) : 'Precio por confirmar'}${hotel.valoracion != null ? ` · ${escapeHtml(hotel.valoracion)} ★` : ''}</p>
+          ${hotelUrl ? `<a class="component-link" href="${escapeHtml(hotelUrl)}" target="_blank" rel="noopener noreferrer">Revisar alojamiento ↗</a>` : '<span class="component-warning">Alojamiento pendiente de confirmar</span>'}
+        </div>
+
         <p><strong>Total estimado:</strong> ${total} · ${escapeHtml(dentro)}</p>
         <p>${escapeHtml(opcion.por_que_es_mejor || '')}</p>
         <div class="saved-actions">
-          <button class="secondary small" onclick="selectWebOption(${principal ? -1 : index})">Seleccionar para guardar</button>
-          ${url ? `<a class="primary small" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Ver proveedor ↗</a>` : ''}
+          <button class="secondary small" ${alojamientoCompleto ? '' : 'disabled'} onclick="selectWebOption(${principal ? -1 : index})">Seleccionar viaje completo</button>
         </div>
       </article>`;
   };
@@ -272,8 +473,6 @@ function renderWebResults(web = {}, data = {}) {
         <span class="badge">Aeropuerto recomendado</span>
         <h3>${escapeHtml(aeropuerto.nombre || aeropuerto.ciudad || 'Aeropuerto más cercano')} ${aeropuerto.codigo ? `(${escapeHtml(aeropuerto.codigo)})` : ''}</h3>
         <p class="muted">${aeropuerto.es_alternativo ? 'El destino no tiene un aeropuerto práctico; se recomienda esta alternativa.' : 'Aeropuerto recomendado para el destino.'}</p>
-        ${aeropuerto.distancia_aprox_km != null ? `<p>Distancia al destino: aprox. ${escapeHtml(aeropuerto.distancia_aprox_km)} km</p>` : ''}
-        ${aeropuerto.medio_traslado ? `<p>Traslado: ${escapeHtml(aeropuerto.medio_traslado)} · ${escapeHtml(aeropuerto.duracion_traslado || '')}</p>` : ''}
         <p>${escapeHtml(aeropuerto.motivo || '')}</p>
       </article>`;
   }
@@ -290,6 +489,18 @@ function renderWebResults(web = {}, data = {}) {
       ${(criterios.supuestos_utilizados || []).length ? `<p class="muted"><strong>Información considerada:</strong> ${escapeHtml(criterios.supuestos_utilizados.join(' · '))}</p>` : ''}
     </article>` : '';
 
+  const fuentesVuelos = fuentes.filter((f) => f.tipo === 'vuelos');
+  const fuentesAlojamientos = fuentes.filter((f) => f.tipo === 'alojamientos');
+
+  const renderFuentes = (lista, vacio) => lista.length
+    ? lista.map((f) => `
+      <a class="source-card" href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer">
+        <strong>${escapeHtml(f.titulo)}</strong>
+        <span>${escapeHtml(f.dominio || f.url)}</span>
+        <small>Abrir proveedor ↗</small>
+      </a>`).join('')
+    : `<p class="muted">${escapeHtml(vacio)}</p>`;
+
   $('webSources').innerHTML = `
     ${criteriosHtml}
     ${airportHtml}
@@ -297,13 +508,24 @@ function renderWebResults(web = {}, data = {}) {
       ${optionCard(mejor, 0, true)}
       ${alternativas.map((o, i) => optionCard(o, i, false)).join('')}
     </div>
-    <h3>Sitios y proveedores consultados</h3>
-    ${fuentes.length ? fuentes.map(f => `
-      <a class="source-card" href="${escapeHtml(f.url)}" target="_blank" rel="noopener noreferrer">
-        <strong>${escapeHtml(f.titulo)}</strong>
-        <span>${escapeHtml(f.dominio || f.url)}</span>
-        <small>Abrir fuente externa ↗</small>
-      </a>`).join('') : '<p class="muted">No se recibieron enlaces verificables.</p>'}`;
+
+    <div class="providers-grid">
+      <section class="provider-group">
+        <div class="provider-group-title">
+          <span aria-hidden="true">✈</span>
+          <div><h3>Proveedores de vuelos</h3><p class="muted">Opciones aéreas consultadas para tu ruta.</p></div>
+        </div>
+        ${renderFuentes(fuentesVuelos, 'No se recibieron enlaces de vuelos verificables.')}
+      </section>
+
+      <section class="provider-group">
+        <div class="provider-group-title">
+          <span aria-hidden="true">⌂</span>
+          <div><h3>Proveedores de alojamiento</h3><p class="muted">Hoteles y otras estadías consultadas para el destino.</p></div>
+        </div>
+        ${renderFuentes(fuentesAlojamientos, 'No se recibieron enlaces de alojamientos verificables.')}
+      </section>
+    </div>`;
 }
 
 window.selectWebOption = function(index) {
@@ -315,7 +537,8 @@ window.selectWebOption = function(index) {
   }
   state.selectedWebOption = opcion;
   $('selectionPanel').classList.remove('hidden');
-  $('selectedVueloText').textContent = `${opcion.origen || ''} → ${opcion.destino_final || ''} · ${opcion.titulo || 'Alternativa seleccionada'} · ${opcion.total_estimado != null ? money(opcion.total_estimado) : 'Precio por confirmar'}`;
+  const alojamiento = opcion.alojamiento?.nombre || 'Alojamiento por confirmar';
+  $('selectedVueloText').textContent = `${opcion.origen || ''} → ${opcion.destino_final || ''} · ${alojamiento} · ${opcion.total_estimado != null ? money(opcion.total_estimado) : 'Precio por confirmar'}`;
   $('selectionPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
 };
 

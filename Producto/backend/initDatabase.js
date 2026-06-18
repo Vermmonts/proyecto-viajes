@@ -46,6 +46,43 @@ async function addColumnIfMissing(connection, table, column, definition) {
   }
 }
 
+async function indexExists(connection, table, indexName) {
+  const [rows] = await connection.query(
+    `SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1`,
+    [DB_NAME, table, indexName]
+  );
+  return rows.length > 0;
+}
+
+async function ensureUniqueUserEmail(connection) {
+  if (!await tableExists(connection, 'usuarios')) return;
+
+  // Normaliza espacios y mayúsculas cuando no existen correos equivalentes duplicados.
+  const [duplicates] = await connection.query(`
+    SELECT LOWER(TRIM(email)) AS normalized_email, COUNT(*) AS total
+    FROM \`${DB_NAME}\`.usuarios
+    GROUP BY LOWER(TRIM(email))
+    HAVING COUNT(*) > 1
+    LIMIT 1
+  `);
+
+  if (duplicates.length) {
+    console.warn('No se agregó el índice único de correo porque existen usuarios duplicados en la base. El registro igualmente bloqueará nuevos duplicados.');
+    return;
+  }
+
+  await connection.query(`UPDATE \`${DB_NAME}\`.usuarios SET email = LOWER(TRIM(email))`);
+
+  const hasExpectedIndex = await indexExists(connection, 'usuarios', 'uq_usuarios_email');
+  if (!hasExpectedIndex) {
+    const [indexes] = await connection.query(`SHOW INDEX FROM \`${DB_NAME}\`.usuarios WHERE Non_unique = 0`);
+    const emailAlreadyUnique = indexes.some(index => index.Column_name === 'email');
+    if (!emailAlreadyUnique) {
+      await connection.query(`ALTER TABLE \`${DB_NAME}\`.usuarios ADD UNIQUE INDEX uq_usuarios_email (email)`);
+    }
+  }
+}
+
 async function modifyColumnIfExists(connection, table, column, definition) {
   const exists = await columnExists(connection, table, column);
   if (exists) {
@@ -65,6 +102,7 @@ async function ensureMigrations(connection) {
     await addColumnIfMissing(connection, 'usuarios', 'fecha_creacion', 'fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP');
     // Compatibilidad con el SQL anterior, que tenía password NOT NULL.
     await modifyColumnIfExists(connection, 'usuarios', 'password', 'password VARCHAR(255) NULL');
+    await ensureUniqueUserEmail(connection);
   }
 
   if (await tableExists(connection, 'vuelos')) {
@@ -126,7 +164,6 @@ async function ensureMigrations(connection) {
     personas INT DEFAULT 1,
     proveedor_vuelo VARCHAR(180) NULL,
     alojamiento VARCHAR(255) NULL,
-    traslado_local TEXT NULL,
     total_estimado DECIMAL(14,2) NULL,
     moneda VARCHAR(10) DEFAULT 'CLP',
     url_reserva TEXT NULL,

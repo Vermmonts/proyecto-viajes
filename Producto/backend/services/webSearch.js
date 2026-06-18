@@ -34,6 +34,53 @@ function valorBooleano(valor, defecto = false) {
   return ['1', 'true', 'si', 'sí', 'yes', 'on'].includes(String(valor).toLowerCase());
 }
 
+function textoErrorServicio(valor) {
+  if (valor === undefined || valor === null || valor === '') return '';
+  if (typeof valor === 'string' || typeof valor === 'number' || typeof valor === 'boolean') {
+    return String(valor);
+  }
+  if (Array.isArray(valor)) {
+    return [...new Set(valor.map(textoErrorServicio).filter(Boolean))].join(' | ');
+  }
+  if (typeof valor === 'object') {
+    const mensaje = valor.message || valor.msg || valor.reason || valor.description || valor.error;
+    const ubicacion = Array.isArray(valor.loc) ? valor.loc.join('.') : '';
+    const detalle = valor.detail && valor.detail !== valor ? textoErrorServicio(valor.detail) : '';
+    const partes = [textoErrorServicio(mensaje), detalle]
+      .filter(Boolean)
+      .map((texto) => ubicacion && !texto.includes(ubicacion) ? `${texto} (${ubicacion})` : texto);
+    if (partes.length) return [...new Set(partes)].join(' | ');
+    try { return JSON.stringify(valor); } catch (_) { return 'Error sin detalle legible'; }
+  }
+  return String(valor);
+}
+
+function crearErrorTavily(response) {
+  const status = Number(response?.status || 0);
+  const payload = response?.payload || {};
+  const detalle = textoErrorServicio(
+    payload.detail || payload.message || payload.error || payload.errors || payload
+  );
+
+  let mensaje;
+  if (status === 400) {
+    mensaje = `La solicitud enviada al buscador no fue válida${detalle ? `: ${detalle}` : '.'}`;
+  } else if (status === 401 || status === 403) {
+    mensaje = 'La clave de Tavily no es válida o no tiene autorización.';
+  } else if (status === 429 || status === 432 || status === 433) {
+    mensaje = `Tavily no tiene cuota disponible o alcanzó su límite de uso${detalle ? `: ${detalle}` : '.'}`;
+  } else if (status >= 500) {
+    mensaje = `Tavily presentó un problema temporal${detalle ? `: ${detalle}` : '.'}`;
+  } else {
+    mensaje = `El servicio de búsqueda respondió HTTP ${status || 'desconocido'}${detalle ? `: ${detalle}` : ''}`;
+  }
+
+  const error = new Error(mensaje);
+  error.tavilyStatus = status;
+  error.httpStatus = [429, 432, 433].includes(status) ? 429 : (status === 401 || status === 403 ? 503 : 502);
+  return error;
+}
+
 /**
  * Solicitud JSON usando los módulos HTTP nativos de Node.
  * Evita el HeadersTimeoutError interno de fetch/Undici en procesos locales largos.
@@ -254,29 +301,41 @@ Reglas:
   return json;
 }
 
-function construirConsultaTavily(interpretacion, textoOriginal) {
+function construirConsultasTavily(interpretacion, textoOriginal) {
   const viajeros = Math.max(1, Number(interpretacion.adultos || 1) + Number(interpretacion.ninos || 0));
+  const origen = interpretacion.origen || 'Santiago de Chile';
   const destino = interpretacion.destino_abierto || !interpretacion.destino
-    ? 'destinos convenientes desde Chile'
+    ? 'destino económico recomendado desde Chile'
     : interpretacion.destino;
-  const fechas = interpretacion.fecha_ida
-    ? `${interpretacion.fecha_ida}${interpretacion.fecha_vuelta ? ` a ${interpretacion.fecha_vuelta}` : ''}`
-    : 'fechas flexibles y tarifas actuales';
+  const fechaIda = interpretacion.fecha_ida || 'fechas flexibles';
+  const fechaVuelta = interpretacion.fecha_vuelta || '';
+  const fechas = fechaVuelta ? `${fechaIda} a ${fechaVuelta}` : fechaIda;
+  const noches = Math.max(1, Number(interpretacion.cantidad_noches || 3));
   const presupuesto = interpretacion.presupuesto_total
-    ? `presupuesto total ${interpretacion.presupuesto_total} ${interpretacion.moneda || 'CLP'}`
-    : 'mejor relación precio calidad';
+    ? `${interpretacion.presupuesto_total} ${interpretacion.moneda || 'CLP'}`
+    : 'mejor precio disponible';
 
-  return [
-    `mejor opción de viaje desde ${interpretacion.origen || 'Santiago de Chile'} a ${destino}`,
-    `${fechas}, ${interpretacion.cantidad_noches || 3} noches, ${viajeros} pasajero(s), ${presupuesto}`,
-    'comparar vuelos actuales, alojamiento, aeropuerto más conveniente, traslado al destino final y enlaces de reserva',
-    `solicitud original: ${textoOriginal}`
-  ].join('. ');
+  // Las consultas principales son deliberadamente breves. Los buscadores suelen
+  // responder mejor a una consulta concreta que a un bloque largo de instrucciones.
+  return {
+    vuelos: `vuelos reservables desde ${origen} hacia ${destino}, ${fechas}, ${viajeros} pasajero(s), precio final, aerolíneas y enlaces de reserva`,
+    vuelos_respaldo: `vuelos ${origen} ${destino} ${fechas} precios aerolíneas reservar`,
+    alojamientos: `alojamientos reservables en ${destino}, ${noches} noches, ${viajeros} huésped(es), presupuesto ${presupuesto}, precio total y enlaces de reserva`,
+    alojamientos_respaldo: `hoteles alojamientos ${destino} ${noches} noches precios reservar`,
+    solicitud_original: String(textoOriginal || '').trim()
+  };
 }
 
-async function buscarConTavily(query) {
+async function buscarConTavily(query, categoria = 'general') {
   const timeoutMs = Number(process.env.TAVILY_TIMEOUT_MS || 90000);
   const maxResults = Math.min(8, Math.max(3, Number(process.env.TAVILY_MAX_RESULTS || 6)));
+  const queryLimpia = String(query || '').replace(/\s+/g, ' ').trim().slice(0, 380);
+
+  if (!queryLimpia) {
+    const error = new Error(`La consulta de ${categoria} está vacía.`);
+    error.httpStatus = 400;
+    throw error;
+  }
 
   let response;
   try {
@@ -287,7 +346,7 @@ async function buscarConTavily(query) {
         Authorization: `Bearer ${process.env.TAVILY_API_KEY.trim()}`
       },
       body: {
-        query,
+        query: queryLimpia,
         topic: 'general',
         search_depth: process.env.TAVILY_SEARCH_DEPTH || 'basic',
         include_answer: true,
@@ -303,78 +362,174 @@ async function buscarConTavily(query) {
   }
 
   if (!response.ok) {
-    throw new Error(
-      response.payload?.detail ||
-      response.payload?.message ||
-      `El servicio de búsqueda respondió HTTP ${response.status}`
-    );
+    throw crearErrorTavily(response);
   }
 
   const payload = response.payload || {};
   const results = Array.isArray(payload.results) ? payload.results : [];
   return {
     answer: payload.answer || '',
-    query: payload.query || query,
+    query: payload.query || queryLimpia,
     response_time: payload.response_time || null,
+    categoria,
     results: results.map((r) => ({
       title: r.title || dominioDe(r.url),
       url: limpiarUrl(r.url),
       content: String(r.content || '').slice(0, 1100),
       score: Number(r.score || 0),
-      published_date: r.published_date || null
+      published_date: r.published_date || null,
+      categoria
     })).filter((r) => r.url)
   };
 }
 
-function crearAnalisisFallback(interpretacion, webData) {
-  const ordenados = [...webData.results].sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
-  const principal = ordenados[0] || {};
-  const destino = interpretacion.destino || 'Destino por confirmar';
-  const personas = Math.max(1, Number(interpretacion.adultos || 1) + Number(interpretacion.ninos || 0));
+function combinarResultadosWeb(busquedas = []) {
+  const vistos = new Set();
+  const results = [];
+  const answers = [];
+  const queries = {};
 
-  const convertirAlternativa = (r, indice) => ({
-    titulo: `Alternativa ${indice + 1}`,
-    origen: interpretacion.origen || 'Santiago de Chile',
-    destino_final: destino,
-    aeropuerto_llegada: 'Por confirmar con el proveedor',
-    fechas: interpretacion.fecha_ida || 'Fechas flexibles',
-    personas,
-    vuelo: {
-      proveedor: dominioDe(r.url),
-      ruta: `${interpretacion.origen || 'Santiago de Chile'} - ${destino}`,
-      escalas: null,
-      precio: null,
-      moneda: interpretacion.moneda || 'CLP',
-      url: r.url,
-      precio_estimado: true
-    },
-    alojamiento: {
-      nombre: 'Alojamiento por confirmar',
-      ubicacion: destino,
-      noches: interpretacion.cantidad_noches || 3,
-      precio_total: null,
-      moneda: interpretacion.moneda || 'CLP',
-      valoracion: null,
-      url: r.url,
-      precio_estimado: true
-    },
-    traslado_local: {
-      descripcion: 'Revisar traslado al destino final en el sitio del proveedor.',
-      precio_estimado: null,
-      moneda: interpretacion.moneda || 'CLP',
-      url: r.url
-    },
-    total_estimado: null,
-    moneda: interpretacion.moneda || 'CLP',
-    dentro_presupuesto: null,
-    diferencia_presupuesto: null,
-    por_que_es_mejor: 'Resultado priorizado por relevancia de la búsqueda. Los precios y la disponibilidad deben confirmarse directamente con el proveedor.',
-    url_reserva: r.url,
-    advertencias: ['No fue posible completar el análisis local; verifica valores, fechas y disponibilidad en el enlace.']
-  });
+  for (const busqueda of busquedas) {
+    if (!busqueda) continue;
+    const categoria = busqueda.categoria || 'general';
+    queries[categoria] = busqueda.query || '';
+    if (busqueda.answer) answers.push(`[${categoria}] ${busqueda.answer}`);
+
+    for (const resultado of busqueda.results || []) {
+      const clave = resultado.url.toLowerCase();
+      if (vistos.has(clave)) continue;
+      vistos.add(clave);
+      results.push({ ...resultado, categoria: resultado.categoria || categoria });
+    }
+  }
 
   return {
-    resumen: webData.answer || 'Se encontraron referencias actuales para continuar la comparación.',
+    answer: answers.join('\n\n'),
+    query: queries,
+    results,
+    por_categoria: {
+      vuelos: results.filter((r) => r.categoria === 'vuelos'),
+      alojamientos: results.filter((r) => r.categoria === 'alojamientos')
+    }
+  };
+}
+
+async function buscarCategoriaConRespaldo(principal, respaldo, categoria) {
+  const consultas = [...new Set([principal, respaldo].filter(Boolean))];
+  const errores = [];
+  const exitosos = [];
+
+  for (let i = 0; i < consultas.length; i += 1) {
+    try {
+      const resultado = await buscarConTavily(consultas[i], categoria);
+      exitosos.push(resultado);
+      const combinado = combinarResultadosWeb(exitosos);
+      const cantidad = combinado.por_categoria[categoria]?.length || 0;
+      if (cantidad >= 2 || i === consultas.length - 1) {
+        return { resultado: combinado, errores };
+      }
+    } catch (error) {
+      errores.push(error);
+      // Una clave inválida o falta de cuota no se corrige repitiendo la consulta.
+      if ([401, 403, 429, 432, 433].includes(Number(error.tavilyStatus || 0))) break;
+    }
+  }
+
+  return { resultado: combinarResultadosWeb(exitosos), errores };
+}
+
+async function buscarCategoriasObligatorias(consultas) {
+  const [vuelos, alojamientos] = await Promise.all([
+    buscarCategoriaConRespaldo(consultas.vuelos, consultas.vuelos_respaldo, 'vuelos'),
+    buscarCategoriaConRespaldo(consultas.alojamientos, consultas.alojamientos_respaldo, 'alojamientos')
+  ]);
+
+  const combinado = combinarResultadosWeb([
+    ...(vuelos.resultado?.results?.length ? [{
+      categoria: 'vuelos',
+      query: vuelos.resultado.query?.vuelos || consultas.vuelos,
+      answer: vuelos.resultado.answer || '',
+      results: vuelos.resultado.por_categoria?.vuelos || []
+    }] : []),
+    ...(alojamientos.resultado?.results?.length ? [{
+      categoria: 'alojamientos',
+      query: alojamientos.resultado.query?.alojamientos || consultas.alojamientos,
+      answer: alojamientos.resultado.answer || '',
+      results: alojamientos.resultado.por_categoria?.alojamientos || []
+    }] : [])
+  ]);
+
+  if (!combinado.por_categoria.vuelos.length) {
+    const errorBase = vuelos.errores[0];
+    const detalle = vuelos.errores.map((e) => e.message).filter(Boolean).join(' | ');
+    const error = new Error(`No fue posible obtener opciones de vuelos${detalle ? `: ${detalle}` : '. Intenta con un origen, destino o fechas diferentes.'}`);
+    error.httpStatus = errorBase?.httpStatus || 502;
+    throw error;
+  }
+
+  if (!combinado.por_categoria.alojamientos.length) {
+    const errorBase = alojamientos.errores[0];
+    const detalle = alojamientos.errores.map((e) => e.message).filter(Boolean).join(' | ');
+    const error = new Error(`No fue posible obtener opciones de alojamiento${detalle ? `: ${detalle}` : '. Intenta con un destino o fechas diferentes.'}`);
+    error.httpStatus = errorBase?.httpStatus || 502;
+    throw error;
+  }
+
+  return combinado;
+}
+
+function crearAnalisisFallback(interpretacion, webData) {
+  const vuelos = [...(webData.por_categoria?.vuelos || [])]
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  const alojamientos = [...(webData.por_categoria?.alojamientos || [])]
+    .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  const destino = interpretacion.destino || 'Destino por confirmar';
+  const personas = Math.max(1, Number(interpretacion.adultos || 1) + Number(interpretacion.ninos || 0));
+  const noches = Math.max(1, Number(interpretacion.cantidad_noches || 3));
+
+  const construirOpcion = (vueloFuente, alojamientoFuente, indice) => {
+    if (!vueloFuente || !alojamientoFuente) return null;
+    return {
+      titulo: indice === 0 ? 'Opción recomendada' : `Alternativa ${indice + 1}`,
+      origen: interpretacion.origen || 'Santiago de Chile',
+      destino_final: destino,
+      aeropuerto_llegada: 'Por confirmar con el proveedor',
+      fechas: interpretacion.fecha_ida || 'Fechas flexibles',
+      personas,
+      vuelo: {
+        proveedor: dominioDe(vueloFuente.url),
+        ruta: `${interpretacion.origen || 'Santiago de Chile'} - ${destino}`,
+        escalas: null,
+        precio: null,
+        moneda: interpretacion.moneda || 'CLP',
+        url: vueloFuente.url,
+        precio_estimado: true
+      },
+      alojamiento: {
+        nombre: alojamientoFuente.title || 'Alojamiento disponible',
+        ubicacion: destino,
+        noches,
+        precio_total: null,
+        moneda: interpretacion.moneda || 'CLP',
+        valoracion: null,
+        url: alojamientoFuente.url,
+        precio_estimado: true
+      },
+      total_estimado: null,
+      moneda: interpretacion.moneda || 'CLP',
+      dentro_presupuesto: null,
+      diferencia_presupuesto: null,
+      por_que_es_mejor: 'Combina una referencia de vuelo y una referencia de alojamiento priorizadas por relevancia. Confirma precios y disponibilidad directamente en cada proveedor.',
+      url_reserva: vueloFuente.url,
+      advertencias: ['Los precios no pudieron estructurarse automáticamente; revisa por separado el vuelo y el alojamiento.']
+    };
+  };
+
+  const cantidad = Math.min(3, vuelos.length, alojamientos.length);
+  const opciones = Array.from({ length: cantidad }, (_, i) => construirOpcion(vuelos[i], alojamientos[i], i)).filter(Boolean);
+
+  return {
+    resumen: webData.answer || 'Se encontraron referencias actuales de vuelos y alojamientos para comparar.',
     criterios_interpretados: interpretacion,
     destino_solicitado: destino,
     aeropuerto_recomendado: {
@@ -382,25 +537,32 @@ function crearAnalisisFallback(interpretacion, webData) {
       codigo: '',
       ciudad: destino,
       es_alternativo: false,
-      distancia_aprox_km: null,
-      duracion_traslado: '',
-      medio_traslado: '',
-      motivo: 'Debe confirmarse según la opción seleccionada.'
+      motivo: 'Se prioriza el aeropuerto más conveniente para la ruta seleccionada.'
     },
-    mejor_opcion: principal.url ? {
-      ...convertirAlternativa(principal, 0),
-      titulo: 'Opción recomendada'
-    } : null,
-    alternativas: ordenados.slice(1, 4).map(convertirAlternativa)
+    mejor_opcion: opciones[0] || null,
+    alternativas: opciones.slice(1),
+    resultados_vuelos: vuelos,
+    resultados_alojamientos: alojamientos
   };
 }
 
 async function analizarResultadosConOllama(textoOriginal, interpretacion, webData) {
-  const resultadosCompactos = webData.results.slice(0, 6).map((r, i) => ({
-    id: i + 1,
+  const vuelosCompactos = (webData.por_categoria?.vuelos || []).slice(0, 5).map((r, i) => ({
+    id: `V${i + 1}`,
+    categoria: 'vuelo',
     titulo: r.title,
     url: r.url,
-    resumen: String(r.content || '').slice(0, 900),
+    resumen: String(r.content || '').slice(0, 850),
+    relevancia: r.score,
+    fecha_publicacion: r.published_date
+  }));
+
+  const alojamientosCompactos = (webData.por_categoria?.alojamientos || []).slice(0, 5).map((r, i) => ({
+    id: `A${i + 1}`,
+    categoria: 'alojamiento',
+    titulo: r.title,
+    url: r.url,
+    resumen: String(r.content || '').slice(0, 850),
     relevancia: r.score,
     fecha_publicacion: r.published_date
   }));
@@ -416,19 +578,26 @@ ${JSON.stringify(interpretacion)}
 Resumen del buscador:
 ${String(webData.answer || '').slice(0, 1500)}
 
-Resultados web:
-${JSON.stringify(resultadosCompactos)}
+Resultados de vuelos:
+${JSON.stringify(vuelosCompactos)}
+
+Resultados de alojamientos:
+${JSON.stringify(alojamientosCompactos)}
 
 Reglas:
-1. Selecciona una sola alternativa como mejor opción.
-2. Si el destino no tiene aeropuerto, elige el aeropuerto práctico más cercano y explica el traslado.
-3. Compara precio, duración, escalas, ubicación, calidad, confiabilidad y practicidad.
-4. No inventes precios, disponibilidad, proveedores ni URLs. Usa null cuando falte un dato.
-5. Las URLs deben coincidir exactamente con las URLs entregadas.
-6. Indica qué debe confirmarse en el sitio del proveedor.
-7. Si no hay tarifas claras, usa la mejor referencia disponible sin fabricar cifras.
-8. Si hay presupuesto, indica si cumple solo cuando existan valores suficientes.
-9. Incluye como máximo tres alternativas.
+1. Selecciona una sola alternativa como mejor opción, pero SIEMPRE debe incluir un vuelo y un alojamiento.
+2. El campo vuelo.url debe usar exclusivamente una URL de los resultados de vuelos.
+3. El campo alojamiento.url debe usar exclusivamente una URL de los resultados de alojamientos.
+4. No uses la misma fuente para vuelo y alojamiento, salvo que el resultado corresponda claramente a un paquete que incluya ambos.
+5. Si el destino no tiene aeropuerto, elige el aeropuerto comercial más práctico y explica por qué es la mejor alternativa aérea.
+6. Compara precio, duración, escalas, ubicación, calidad, valoración, confiabilidad, cancelación y practicidad.
+7. No inventes precios, disponibilidad, proveedores ni URLs. Usa null cuando falte un dato.
+8. Las URLs deben coincidir exactamente con las URLs entregadas.
+9. Indica qué debe confirmarse en el sitio de cada proveedor.
+10. Si no hay tarifas claras, usa la mejor referencia disponible sin fabricar cifras.
+11. Si hay presupuesto, indica si cumple solo cuando existan valores suficientes.
+12. Incluye como máximo tres alternativas, y cada alternativa también debe incluir vuelo y alojamiento.
+13. No declares una opción como completa si falta alojamiento.
 
 Formato:
 {
@@ -440,9 +609,6 @@ Formato:
     "codigo": "",
     "ciudad": "",
     "es_alternativo": false,
-    "distancia_aprox_km": null,
-    "duracion_traslado": "",
-    "medio_traslado": "",
     "motivo": ""
   },
   "mejor_opcion": {
@@ -454,7 +620,6 @@ Formato:
     "personas": 1,
     "vuelo": {"proveedor":"","ruta":"","escalas":null,"precio":null,"moneda":"CLP","url":"","precio_estimado":true},
     "alojamiento": {"nombre":"","ubicacion":"","noches":null,"precio_total":null,"moneda":"CLP","valoracion":null,"url":"","precio_estimado":true},
-    "traslado_local": {"descripcion":"","precio_estimado":null,"moneda":"CLP","url":""},
     "total_estimado": null,
     "moneda": "CLP",
     "dentro_presupuesto": null,
@@ -473,6 +638,44 @@ Formato:
   return { datos: json, model };
 }
 
+function opcionIncluyeVueloYAlojamiento(opcion) {
+  return Boolean(
+    opcion &&
+    opcion.vuelo &&
+    limpiarUrl(opcion.vuelo.url || '') &&
+    opcion.alojamiento &&
+    limpiarUrl(opcion.alojamiento.url || '') &&
+    (opcion.alojamiento.nombre || opcion.alojamiento.ubicacion)
+  );
+}
+
+function asegurarOpcionesCompletas(datos, interpretacion, webData) {
+  const fallback = crearAnalisisFallback(interpretacion, webData);
+  const mejorValida = opcionIncluyeVueloYAlojamiento(datos?.mejor_opcion)
+    ? datos.mejor_opcion
+    : fallback.mejor_opcion;
+
+  const alternativasValidas = (datos?.alternativas || [])
+    .filter(opcionIncluyeVueloYAlojamiento)
+    .slice(0, 3);
+
+  if (alternativasValidas.length < 2) {
+    for (const alternativa of fallback.alternativas || []) {
+      if (alternativasValidas.length >= 2) break;
+      if (opcionIncluyeVueloYAlojamiento(alternativa)) alternativasValidas.push(alternativa);
+    }
+  }
+
+  return {
+    ...fallback,
+    ...(datos || {}),
+    mejor_opcion: mejorValida,
+    alternativas: alternativasValidas,
+    resultados_vuelos: webData.por_categoria?.vuelos || [],
+    resultados_alojamientos: webData.por_categoria?.alojamientos || []
+  };
+}
+
 async function guardarResultado({ consulta, interpretacion, datos, fuentes }) {
   const connection = await pool.getConnection();
   try {
@@ -482,8 +685,15 @@ async function guardarResultado({ consulta, interpretacion, datos, fuentes }) {
     for (const fuente of fuentes) {
       const [result] = await connection.query(
         `INSERT INTO fuentes_web (titulo, url, dominio, tipo, consulta_usuario, contenido_resumen)
-         VALUES (?, ?, ?, 'viaje', ?, ?)`,
-        [fuente.titulo, fuente.url, fuente.dominio, consulta, String(fuente.resumen || '').slice(0, 4000)]
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          fuente.titulo,
+          fuente.url,
+          fuente.dominio,
+          fuente.tipo || 'viaje',
+          consulta,
+          String(fuente.resumen || '').slice(0, 4000)
+        ]
       );
       fuenteIds.push(result.insertId);
     }
@@ -539,11 +749,11 @@ async function buscarEnWeb(filtros, textoOriginal = '') {
     interpretacion = interpretacionFallback(textoOriginal, filtros);
   }
 
-  const query = construirConsultaTavily(interpretacion, textoOriginal);
-  const webData = await buscarConTavily(query);
+  const consultas = construirConsultasTavily(interpretacion, textoOriginal);
+  const webData = await buscarCategoriasObligatorias(consultas);
 
-  if (!webData.results.length) {
-    throw new Error('No se encontraron resultados actuales para esta búsqueda.');
+  if (!webData.por_categoria.vuelos.length || !webData.por_categoria.alojamientos.length) {
+    throw new Error('La búsqueda debe incluir tanto vuelos como alojamientos.');
   }
 
   let analisis;
@@ -557,12 +767,15 @@ async function buscarEnWeb(filtros, textoOriginal = '') {
     };
   }
 
+  analisis.datos = asegurarOpcionesCompletas(analisis.datos, interpretacion, webData);
+
   const fuentes = webData.results.map((r) => ({
     titulo: r.title || dominioDe(r.url) || 'Fuente web',
     url: r.url,
     dominio: dominioDe(r.url),
     resumen: r.content,
-    relevancia: r.score
+    relevancia: r.score,
+    tipo: r.categoria || 'viaje'
   }));
 
   await guardarResultado({
@@ -576,7 +789,7 @@ async function buscarEnWeb(filtros, textoOriginal = '') {
     usada: true,
     proveedor: 'Comparador web',
     modelo: analisis.model,
-    consulta_web: query,
+    consulta_web: consultas,
     respuesta: webData.answer,
     fuentes,
     interpretacion,
@@ -589,5 +802,7 @@ module.exports = {
   webEstaConfigurada,
   llamarOllama,
   interpretarSolicitudConOllama,
-  buscarConTavily
+  buscarConTavily,
+  construirConsultasTavily,
+  buscarCategoriasObligatorias
 };

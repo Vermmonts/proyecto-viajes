@@ -17,7 +17,7 @@ router.get('/', authRequired, async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, titulo, origen, destino, aeropuerto_llegada, fechas, personas,
-              proveedor_vuelo AS aerolinea, alojamiento AS hotel, traslado_local,
+              proveedor_vuelo AS aerolinea, alojamiento AS hotel,
               total_estimado, moneda, url_reserva, estado, notas,
               fecha_guardado, fecha_actualizacion, 'web' AS tipo_origen
        FROM viajes_web_guardados
@@ -54,15 +54,14 @@ router.post('/', authRequired, async (req, res) => {
 
     const vuelo = opcion.vuelo || {};
     const alojamiento = opcion.alojamiento || {};
-    const traslado = opcion.traslado_local || {};
-    const url = texto(opcion.url_reserva || vuelo.url || alojamiento.url || traslado.url, 2000);
+    const url = texto(opcion.url_reserva || vuelo.url || alojamiento.url, 2000);
 
     const [result] = await pool.query(
       `INSERT INTO viajes_web_guardados
        (usuario_id, titulo, origen, destino, aeropuerto_llegada, fechas, personas,
-        proveedor_vuelo, alojamiento, traslado_local, total_estimado, moneda,
+        proveedor_vuelo, alojamiento, total_estimado, moneda,
         url_reserva, fuente_json, estado, notas)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.id,
         texto(opcion.titulo || 'Mejor opción encontrada en internet') || 'Mejor opción encontrada en internet',
@@ -73,7 +72,6 @@ router.post('/', authRequired, async (req, res) => {
         Math.max(1, Number(opcion.personas || 1)),
         texto(vuelo.proveedor, 180),
         texto(alojamiento.nombre, 255),
-        texto(traslado.descripcion, 2000),
         numero(opcion.total_estimado),
         texto(opcion.moneda || vuelo.moneda || 'CLP', 10) || 'CLP',
         url,

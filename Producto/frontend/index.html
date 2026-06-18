@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Compara vuelos, alojamientos y traslados para encontrar una opción de viaje conveniente." />
+  <meta name="description" content="Compara vuelos y alojamientos para encontrar una opción de viaje conveniente." />
   <title>Flyandlodget | Tu viaje, todo en un solo lugar</title>
   <link rel="icon" type="image/png" href="assets/flyandlodget-logo.png" />
   <link rel="stylesheet" href="css/styles.css" />
@@ -43,7 +43,7 @@
         <div class="hero-copy-wrap">
           <p class="kicker">Compara, elige y guarda</p>
           <h1>Encuentra una mejor forma de viajar</h1>
-          <p class="hero-copy">Revisa alternativas de vuelo, alojamiento y traslado en una sola búsqueda.</p>
+          <p class="hero-copy">Revisa alternativas de vuelo y alojamiento en una sola búsqueda.</p>
         </div>
 
         <div class="search-shell" id="buscar">
@@ -88,7 +88,7 @@
     </section>
 
     <section class="benefits-bar" aria-label="Beneficios del servicio">
-      <div class="benefit"><span class="benefit-icon">✓</span><div><strong>Comparación centralizada</strong><small>Vuelos, estadía y traslados</small></div></div>
+      <div class="benefit"><span class="benefit-icon">✓</span><div><strong>Comparación centralizada</strong><small>Vuelos y alojamientos</small></div></div>
       <div class="benefit"><span class="benefit-icon">↗</span><div><strong>Fuentes verificables</strong><small>Acceso directo a proveedores</small></div></div>
       <div class="benefit"><span class="benefit-icon">★</span><div><strong>Opciones priorizadas</strong><small>Según precio y conveniencia</small></div></div>
     </section>
@@ -192,11 +192,13 @@
       <p class="section-label">Acceso de usuarios</p>
       <h2 id="loginTitle">Iniciar sesión</h2>
       <p class="muted">Accede para guardar y administrar tus alternativas de viaje.</p>
-      <form id="loginForm" class="auth-form">
-        <label>Correo electrónico</label>
-        <input type="email" name="email" required autocomplete="email" />
-        <label>Contraseña</label>
-        <input type="password" name="password" required autocomplete="current-password" />
+      <form id="loginForm" class="auth-form" novalidate>
+        <label for="loginEmail">Correo electrónico</label>
+        <input id="loginEmail" type="email" name="email" maxlength="150" required autocomplete="email" inputmode="email" placeholder="nombre@dominio.cl" />
+        <small class="field-message" data-error-for="login-email"></small>
+        <label for="loginPassword">Contraseña</label>
+        <input id="loginPassword" type="password" name="password" required autocomplete="current-password" />
+        <small class="field-message" data-error-for="login-password"></small>
         <button class="btn btn-primary" type="submit">Ingresar</button>
       </form>
     </div>
@@ -208,13 +210,30 @@
       <p class="section-label">Nueva cuenta</p>
       <h2 id="registerTitle">Crear cuenta</h2>
       <p class="muted">Regístrate para guardar tus búsquedas y gestionar tus reservas.</p>
-      <form id="registroForm" class="auth-form">
-        <label>Nombre</label>
-        <input name="nombre" required autocomplete="name" />
-        <label>Correo electrónico</label>
-        <input type="email" name="email" required autocomplete="email" />
-        <label>Contraseña</label>
-        <input type="password" name="password" minlength="4" required autocomplete="new-password" />
+      <form id="registroForm" class="auth-form" novalidate>
+        <label for="registroNombre">Nombre</label>
+        <input id="registroNombre" type="text" name="nombre" minlength="2" maxlength="100" required autocomplete="name" placeholder="Nombre y apellido" />
+        <small class="field-message" data-error-for="registro-nombre"></small>
+
+        <label for="registroEmail">Correo electrónico</label>
+        <input id="registroEmail" type="email" name="email" maxlength="150" required autocomplete="email" inputmode="email" placeholder="nombre@dominio.cl" />
+        <small class="field-message" data-error-for="registro-email"></small>
+
+        <label for="registroPassword">Contraseña</label>
+        <input id="registroPassword" type="password" name="password" minlength="8" maxlength="72" required autocomplete="new-password" aria-describedby="passwordRules" />
+        <div class="password-rules" id="passwordRules" aria-live="polite">
+          <span data-rule="length">8 caracteres como mínimo</span>
+          <span data-rule="lower">Una letra minúscula</span>
+          <span data-rule="upper">Una letra mayúscula</span>
+          <span data-rule="number">Un número</span>
+          <span data-rule="symbol">Un símbolo</span>
+        </div>
+        <small class="field-message" data-error-for="registro-password"></small>
+
+        <label for="registroConfirmPassword">Confirmar contraseña</label>
+        <input id="registroConfirmPassword" type="password" name="confirmPassword" minlength="8" maxlength="72" required autocomplete="new-password" />
+        <small class="field-message" data-error-for="registro-confirm-password"></small>
+
         <button class="btn btn-primary" type="submit">Crear cuenta</button>
       </form>
     </div>
@@ -239,7 +258,7 @@
           <option value="cancelado">Cancelado</option>
         </select>
         <label>Notas</label>
-        <textarea id="editNotas" maxlength="500" placeholder="Ej: Revisar equipaje, traslado o condiciones del alojamiento."></textarea>
+        <textarea id="editNotas" maxlength="500" placeholder="Ej: Revisar equipaje o condiciones del alojamiento."></textarea>
         <button class="btn btn-primary" type="submit">Guardar cambios</button>
       </form>
     </div>
