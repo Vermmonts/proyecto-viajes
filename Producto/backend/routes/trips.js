@@ -55,6 +55,15 @@ router.post('/', authRequired, async (req, res) => {
     const vuelo = opcion.vuelo || {};
     const alojamiento = opcion.alojamiento || {};
     const url = texto(opcion.url_reserva || vuelo.url || alojamiento.url, 2000);
+    const total = numero(opcion.total_estimado);
+    const presupuestoMaximo = numero(opcion.presupuesto_maximo);
+
+    if (presupuestoMaximo !== null && (total === null || total > presupuestoMaximo)) {
+      return res.status(400).json({
+        ok: false,
+        message: 'Esta alternativa no puede guardarse porque no respeta el presupuesto máximo indicado.'
+      });
+    }
 
     const [result] = await pool.query(
       `INSERT INTO viajes_web_guardados
@@ -72,7 +81,7 @@ router.post('/', authRequired, async (req, res) => {
         Math.max(1, Number(opcion.personas || 1)),
         texto(vuelo.proveedor, 180),
         texto(alojamiento.nombre, 255),
-        numero(opcion.total_estimado),
+        total,
         texto(opcion.moneda || vuelo.moneda || 'CLP', 10) || 'CLP',
         url,
         JSON.stringify(opcion),

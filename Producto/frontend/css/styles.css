@@ -616,3 +616,40 @@ a { color: inherit; }
 @media (max-width: 520px) {
   .password-rules { grid-template-columns: 1fr; }
 }
+
+/* Edición de perfil y control estricto de presupuesto */
+.modal-card-wide {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.auth-form input[readonly] {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+.profile-password-section {
+  margin-top: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.profile-password-section h3 {
+  margin: 0 0 3px;
+  font-size: 17px;
+}
+.profile-password-section p { margin: 0; }
+.budget-limit-notice {
+  margin: 16px 0 20px;
+  padding: 18px 20px;
+  border: 1px solid #fed7aa;
+  border-left: 5px solid #ea580c;
+  border-radius: 9px;
+  background: #fff7ed;
+  color: #9a3412;
+}
+.budget-limit-notice strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 17px;
+}
+.budget-limit-notice p { margin: 0; }

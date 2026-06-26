@@ -114,6 +114,29 @@ $('logoutBtn').addEventListener('click', () => {
   toast('Sesión cerrada.');
 });
 
+$('profileBtn')?.addEventListener('click', async () => {
+  if (!state.token) {
+    openModal('loginModal');
+    return;
+  }
+
+  clearProfileErrors();
+  $('profileCurrentPassword').value = '';
+  $('profileNewPassword').value = '';
+  $('profileConfirmPassword').value = '';
+  updateProfilePasswordRules();
+
+  try {
+    const data = await request('/api/auth/perfil');
+    const user = data.user || data.usuario || state.user;
+    $('profileName').value = user?.nombre || '';
+    $('profileEmail').value = user?.email || '';
+    openModal('profileModal');
+  } catch (error) {
+    toast(error.message);
+  }
+});
+
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -152,6 +175,22 @@ function clearRegistrationErrors() {
 function clearLoginErrors() {
   setFieldError('loginEmail', 'login-email');
   setFieldError('loginPassword', 'login-password');
+}
+
+function clearProfileErrors() {
+  setFieldError('profileName', 'profile-name');
+  setFieldError('profileCurrentPassword', 'profile-current-password');
+  setFieldError('profileNewPassword', 'profile-new-password');
+  setFieldError('profileConfirmPassword', 'profile-confirm-password');
+}
+
+function updateProfilePasswordRules() {
+  const password = $('profileNewPassword')?.value || '';
+  const checks = passwordChecks(password);
+  document.querySelectorAll('#profilePasswordRules [data-rule]').forEach(item => {
+    item.classList.toggle('valid', Boolean(checks[item.dataset.rule]));
+  });
+  return checks;
 }
 
 function setFormLoading(form, loading, loadingText) {
@@ -237,6 +276,14 @@ $('registroEmail')?.addEventListener('input', () => setFieldError('registroEmail
 $('loginEmail')?.addEventListener('input', () => setFieldError('loginEmail', 'login-email'));
 $('loginPassword')?.addEventListener('input', () => setFieldError('loginPassword', 'login-password'));
 
+$('profileName')?.addEventListener('input', () => setFieldError('profileName', 'profile-name'));
+$('profileCurrentPassword')?.addEventListener('input', () => setFieldError('profileCurrentPassword', 'profile-current-password'));
+$('profileNewPassword')?.addEventListener('input', () => {
+  updateProfilePasswordRules();
+  setFieldError('profileNewPassword', 'profile-new-password');
+});
+$('profileConfirmPassword')?.addEventListener('input', () => setFieldError('profileConfirmPassword', 'profile-confirm-password'));
+
 $('registroForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target;
@@ -311,6 +358,75 @@ $('loginForm').addEventListener('submit', async (e) => {
   }
 });
 
+$('profileForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  clearProfileErrors();
+
+  const values = Object.fromEntries(new FormData(form).entries());
+  values.nombre = String(values.nombre || '').trim().replace(/\s+/g, ' ');
+  values.currentPassword = String(values.currentPassword || '');
+  values.newPassword = String(values.newPassword || '');
+  values.confirmPassword = String(values.confirmPassword || '');
+  let valid = true;
+
+  if (values.nombre.length < 2) {
+    setFieldError('profileName', 'profile-name', 'Ingresa un nombre de al menos 2 caracteres.');
+    valid = false;
+  } else if (values.nombre.length > 100) {
+    setFieldError('profileName', 'profile-name', 'El nombre no puede superar los 100 caracteres.');
+    valid = false;
+  } else if (!/^[\p{L}\p{M}.'’\- ]+$/u.test(values.nombre)) {
+    setFieldError('profileName', 'profile-name', 'Usa solamente letras, espacios, puntos, apóstrofes o guiones.');
+    valid = false;
+  }
+
+  const changingPassword = Boolean(values.currentPassword || values.newPassword || values.confirmPassword);
+  if (changingPassword) {
+    if (!values.currentPassword) {
+      setFieldError('profileCurrentPassword', 'profile-current-password', 'Ingresa tu contraseña actual.');
+      valid = false;
+    }
+    const checks = updateProfilePasswordRules();
+    if (!values.newPassword || !Object.values(checks).every(Boolean)) {
+      setFieldError('profileNewPassword', 'profile-new-password', 'La nueva contraseña debe cumplir todos los requisitos.');
+      valid = false;
+    }
+    if (!values.confirmPassword || values.newPassword !== values.confirmPassword) {
+      setFieldError('profileConfirmPassword', 'profile-confirm-password', 'Las contraseñas no coinciden.');
+      valid = false;
+    }
+  }
+
+  if (!valid) {
+    form.querySelector('.input-invalid')?.focus();
+    toast('Revisa los datos del perfil.');
+    return;
+  }
+
+  setFormLoading(form, true, 'Guardando...');
+  try {
+    const data = await request('/api/auth/perfil', {
+      method: 'PUT',
+      body: JSON.stringify(values)
+    });
+    saveSession(data);
+    clearProfileErrors();
+    closeModals();
+    toast(data.message || 'Perfil actualizado correctamente.');
+  } catch (err) {
+    const fields = err.fields || {};
+    if (fields.nombre) setFieldError('profileName', 'profile-name', fields.nombre);
+    if (fields.currentPassword) setFieldError('profileCurrentPassword', 'profile-current-password', fields.currentPassword);
+    if (fields.newPassword) setFieldError('profileNewPassword', 'profile-new-password', fields.newPassword);
+    if (fields.confirmPassword) setFieldError('profileConfirmPassword', 'profile-confirm-password', fields.confirmPassword);
+    form.querySelector('.input-invalid')?.focus();
+    toast(err.message);
+  } finally {
+    setFormLoading(form, false);
+  }
+});
+
 function saveSession(data) {
   state.token = data.token;
   state.user = data.user;
@@ -352,8 +468,8 @@ $('searchForm').addEventListener('submit', async (e) => {
     state.hoteles = [];
     state.lastResults = [];
     $('searchStatus').textContent = data.mejor_opcion
-      ? 'Vuelo y alojamiento encontrados'
-      : 'Búsqueda completada';
+      ? 'Vuelo y alojamiento dentro del presupuesto'
+      : (data.web?.datos?.sin_opciones_dentro_presupuesto ? 'Sin opciones dentro del presupuesto' : 'Búsqueda completada');
     renderWebResults(data.web, data);
   } catch (err) {
     $('searchStatus').textContent = 'No fue posible completar la búsqueda';
@@ -375,10 +491,10 @@ function renderAIPlan(plan = {}) {
   }
   panel.classList.remove('hidden');
   const presupuesto = plan.presupuesto_total ? money(plan.presupuesto_total) : 'sin límite indicado';
-  $('aiPlanSummary').textContent = `Presupuesto: ${presupuesto} · ${plan.noches} noches · ${plan.personas} persona(s). ${plan.hay_opciones_en_presupuesto === false ? 'No hay opciones dentro del monto; se muestran las más cercanas.' : ''}`;
+  $('aiPlanSummary').textContent = `Presupuesto: ${presupuesto} · ${plan.noches} noches · ${plan.personas} persona(s). ${plan.hay_opciones_en_presupuesto === false ? 'No hay opciones que respeten el límite indicado.' : ''}`;
   $('aiPlanGrid').innerHTML = propuestas.map((p, index) => `
     <article class="plan-card ${p.dentro_presupuesto ? 'within-budget' : ''}">
-      <span class="badge">${index === 0 ? 'Opción recomendada' : (p.dentro_presupuesto ? 'Dentro del presupuesto' : 'Alternativa cercana')}</span>
+      <span class="badge">${index === 0 ? 'Opción recomendada' : 'Dentro del presupuesto'}</span>
       <h3>${escapeHtml(p.vuelo.origen)} → ${escapeHtml(p.vuelo.destino)}</h3>
       <p class="muted">${escapeHtml(p.vuelo.aerolinea)} + ${escapeHtml(p.hotel.nombre)}</p>
       <div class="plan-costs">
@@ -412,7 +528,13 @@ function renderWebResults(web = {}, data = {}) {
 
   panel.classList.remove('hidden');
   $('webAnswer').textContent = data.resumen || datos.resumen || web.motivo || 'Comparamos distintas fuentes para presentar una alternativa conveniente.';
-  const criterios = datos.criterios_interpretados || {};
+  const criterios = {
+    ...(web.interpretacion || {}),
+    ...(data.interpretacion || {}),
+    ...(datos.criterios_interpretados || {})
+  };
+  const destinoResumen = criterios.destino_o_zona || criterios.destino || datos.destino_solicitado || mejor?.destino_final || '';
+  const origenResumen = criterios.origen || mejor?.origen || '';
 
   const optionCard = (opcion, index, principal = false) => {
     if (!opcion) return '';
@@ -427,7 +549,7 @@ function renderWebResults(web = {}, data = {}) {
     const alojamientoCompleto = Boolean(hotel.nombre || hotel.ubicacion || hotelUrl);
 
     return `
-      <article class="plan-card ${principal ? 'within-budget' : ''}">
+      <article class="plan-card ${opcion.dentro_presupuesto === true ? 'within-budget' : ''}">
         <span class="badge">${principal ? 'Mejor opción' : `Alternativa ${index + 1}`}</span>
         <h3>${escapeHtml(opcion.origen || '')} → ${escapeHtml(opcion.destino_final || '')}</h3>
         <p class="muted"><strong>Aeropuerto de llegada:</strong> ${escapeHtml(opcion.aeropuerto_llegada || 'Por confirmar')}</p>
@@ -461,7 +583,7 @@ function renderWebResults(web = {}, data = {}) {
         <p><strong>Total estimado:</strong> ${total} · ${escapeHtml(dentro)}</p>
         <p>${escapeHtml(opcion.por_que_es_mejor || '')}</p>
         <div class="saved-actions">
-          <button class="secondary small" ${alojamientoCompleto ? '' : 'disabled'} onclick="selectWebOption(${principal ? -1 : index})">Seleccionar viaje completo</button>
+          <button class="secondary small" ${alojamientoCompleto && opcion.dentro_presupuesto !== false ? '' : 'disabled'} onclick="selectWebOption(${principal ? -1 : index})">Seleccionar viaje completo</button>
         </div>
       </article>`;
   };
@@ -480,7 +602,7 @@ function renderWebResults(web = {}, data = {}) {
   const criteriosHtml = Object.keys(criterios).length ? `
     <article class="featured-card">
       <span class="badge">Resumen del viaje</span>
-      <p><strong>Ruta:</strong> ${escapeHtml(criterios.origen || 'Origen por confirmar')} → ${escapeHtml(criterios.destino_o_zona || 'Destino flexible')}</p>
+      <p><strong>Ruta:</strong> ${escapeHtml(origenResumen || 'Origen por confirmar')} → ${escapeHtml(destinoResumen || 'Destino flexible')}</p>
       <p><strong>Fechas:</strong> ${escapeHtml(criterios.fechas_o_flexibilidad || 'Flexibles')} · <strong>Duración:</strong> ${escapeHtml(criterios.duracion || 'Flexible')}</p>
       <p><strong>Viajeros:</strong> ${escapeHtml(criterios.viajeros || 'No especificado')} · <strong>Presupuesto:</strong> ${escapeHtml(criterios.presupuesto || 'No indicado')}</p>
       <p><strong>Tipo de viaje:</strong> ${escapeHtml(criterios.tipo_viaje || 'General')}</p>
@@ -501,13 +623,18 @@ function renderWebResults(web = {}, data = {}) {
       </a>`).join('')
     : `<p class="muted">${escapeHtml(vacio)}</p>`;
 
+  const budgetNotice = datos.sin_opciones_dentro_presupuesto
+    ? `<article class="budget-limit-notice"><strong>No hay opciones válidas dentro del presupuesto</strong><p>${escapeHtml(datos.mensaje_presupuesto || 'No se mostrarán alternativas que excedan el límite indicado.')}</p></article>`
+    : '';
+
   $('webSources').innerHTML = `
     ${criteriosHtml}
     ${airportHtml}
-    <div class="ai-plan-grid">
+    ${budgetNotice}
+    ${(mejor || alternativas.length) ? `<div class="ai-plan-grid">
       ${optionCard(mejor, 0, true)}
       ${alternativas.map((o, i) => optionCard(o, i, false)).join('')}
-    </div>
+    </div>` : ''}
 
     <div class="providers-grid">
       <section class="provider-group">
@@ -533,6 +660,12 @@ window.selectWebOption = function(index) {
   const opcion = index === -1 ? datos.mejor_opcion : (datos.alternativas || [])[index];
   if (!opcion) {
     toast('No se pudo seleccionar esa opción.');
+    return;
+  }
+  const presupuesto = Number(opcion.presupuesto_maximo || 0);
+  const total = Number(opcion.total_estimado);
+  if (opcion.dentro_presupuesto === false || (presupuesto > 0 && (!Number.isFinite(total) || total > presupuesto))) {
+    toast('Esta alternativa supera el presupuesto máximo y no puede seleccionarse.');
     return;
   }
   state.selectedWebOption = opcion;

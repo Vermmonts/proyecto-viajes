@@ -34,6 +34,99 @@ function valorBooleano(valor, defecto = false) {
   return ['1', 'true', 'si', 'sí', 'yes', 'on'].includes(String(valor).toLowerCase());
 }
 
+
+function numeroMonetario(valor) {
+  if (valor === undefined || valor === null || valor === '') return null;
+  if (typeof valor === 'number') return Number.isFinite(valor) && valor >= 0 ? valor : null;
+
+  let texto = String(valor).trim();
+  if (!texto) return null;
+  texto = texto.replace(/[^0-9,.-]/g, '');
+  if (!texto) return null;
+
+  const tieneComa = texto.includes(',');
+  const tienePunto = texto.includes('.');
+  if (tieneComa && tienePunto) {
+    const ultimoSeparador = Math.max(texto.lastIndexOf(','), texto.lastIndexOf('.'));
+    const enteros = texto.slice(0, ultimoSeparador).replace(/[.,]/g, '');
+    const decimales = texto.slice(ultimoSeparador + 1).replace(/[.,]/g, '');
+    texto = `${enteros}.${decimales}`;
+  } else if (tieneComa || tienePunto) {
+    const separador = tieneComa ? ',' : '.';
+    const partes = texto.split(separador);
+    const ultima = partes[partes.length - 1];
+    if (partes.length > 2 || ultima.length === 3) texto = partes.join('');
+    else texto = partes.join('.');
+  }
+
+  const numero = Number(texto);
+  return Number.isFinite(numero) && numero >= 0 ? numero : null;
+}
+
+function totalOpcion(opcion = {}) {
+  const totalDeclarado = numeroMonetario(opcion.total_estimado);
+  if (totalDeclarado !== null) return totalDeclarado;
+
+  const vuelo = numeroMonetario(opcion.vuelo?.precio);
+  const alojamiento = numeroMonetario(opcion.alojamiento?.precio_total);
+  if (vuelo === null || alojamiento === null) return null;
+  return vuelo + alojamiento;
+}
+
+function aplicarPresupuestoEstricto(datos = {}, interpretacion = {}) {
+  const presupuesto = numeroMonetario(interpretacion.presupuesto_total);
+  if (presupuesto === null || presupuesto <= 0) {
+    return { ...datos, presupuesto_estricto: false };
+  }
+
+  const originales = [datos.mejor_opcion, ...(Array.isArray(datos.alternativas) ? datos.alternativas : [])]
+    .filter(Boolean);
+  const dentro = [];
+
+  for (const opcionOriginal of originales) {
+    const total = totalOpcion(opcionOriginal);
+    if (total === null || total > presupuesto) continue;
+
+    dentro.push({
+      ...opcionOriginal,
+      total_estimado: total,
+      moneda: opcionOriginal.moneda || interpretacion.moneda || 'CLP',
+      dentro_presupuesto: true,
+      diferencia_presupuesto: Math.max(0, presupuesto - total),
+      presupuesto_maximo: presupuesto
+    });
+  }
+
+  // Mantiene el orden de calidad definido por el analizador, pero jamás promueve
+  // una opción que supere el presupuesto o cuyo total no pueda verificarse.
+  const mejor = dentro[0] || null;
+  const alternativas = dentro.slice(1, 4);
+
+  if (!mejor) {
+    const mensaje = `No se encontró una combinación verificable de vuelo y alojamiento por un total máximo de ${Math.round(presupuesto)} ${interpretacion.moneda || 'CLP'}. No se mostrarán opciones que superen ese límite.`;
+    return {
+      ...datos,
+      mejor_opcion: null,
+      alternativas: [],
+      presupuesto_estricto: true,
+      presupuesto_maximo: presupuesto,
+      sin_opciones_dentro_presupuesto: true,
+      mensaje_presupuesto: mensaje,
+      resumen: mensaje
+    };
+  }
+
+  return {
+    ...datos,
+    mejor_opcion: mejor,
+    alternativas,
+    presupuesto_estricto: true,
+    presupuesto_maximo: presupuesto,
+    sin_opciones_dentro_presupuesto: false,
+    mensaje_presupuesto: `Todas las opciones mostradas respetan el límite máximo de ${Math.round(presupuesto)} ${interpretacion.moneda || 'CLP'}.`
+  };
+}
+
 function textoErrorServicio(valor) {
   if (valor === undefined || valor === null || valor === '') return '';
   if (typeof valor === 'string' || typeof valor === 'number' || typeof valor === 'boolean') {
@@ -311,17 +404,18 @@ function construirConsultasTavily(interpretacion, textoOriginal) {
   const fechaVuelta = interpretacion.fecha_vuelta || '';
   const fechas = fechaVuelta ? `${fechaIda} a ${fechaVuelta}` : fechaIda;
   const noches = Math.max(1, Number(interpretacion.cantidad_noches || 3));
-  const presupuesto = interpretacion.presupuesto_total
-    ? `${interpretacion.presupuesto_total} ${interpretacion.moneda || 'CLP'}`
+  const presupuestoNumero = numeroMonetario(interpretacion.presupuesto_total);
+  const presupuesto = presupuestoNumero
+    ? `${presupuestoNumero} ${interpretacion.moneda || 'CLP'} como máximo para vuelo y alojamiento juntos`
     : 'mejor precio disponible';
 
-  // Las consultas principales son deliberadamente breves. Los buscadores suelen
-  // responder mejor a una consulta concreta que a un bloque largo de instrucciones.
+  // Las consultas incluyen el límite total para aumentar la probabilidad de recibir
+  // tarifas que puedan combinarse sin exceder el presupuesto indicado.
   return {
-    vuelos: `vuelos reservables desde ${origen} hacia ${destino}, ${fechas}, ${viajeros} pasajero(s), precio final, aerolíneas y enlaces de reserva`,
-    vuelos_respaldo: `vuelos ${origen} ${destino} ${fechas} precios aerolíneas reservar`,
-    alojamientos: `alojamientos reservables en ${destino}, ${noches} noches, ${viajeros} huésped(es), presupuesto ${presupuesto}, precio total y enlaces de reserva`,
-    alojamientos_respaldo: `hoteles alojamientos ${destino} ${noches} noches precios reservar`,
+    vuelos: `vuelos ida y vuelta reservables desde ${origen} hacia ${destino}, ${fechas}, ${viajeros} pasajero(s), precio total final para todos los pasajeros, viaje completo con presupuesto ${presupuesto}, aerolíneas y enlaces de reserva`,
+    vuelos_respaldo: `vuelos ${origen} ${destino} ${fechas} ${viajeros} pasajeros precio total reservar presupuesto máximo ${presupuesto}`,
+    alojamientos: `alojamientos reservables en ${destino}, ${noches} noches, ${viajeros} huésped(es), precio total de toda la estadía, viaje completo con presupuesto ${presupuesto}, enlaces de reserva`,
+    alojamientos_respaldo: `hoteles alojamientos ${destino} ${noches} noches ${viajeros} huéspedes precio total reservar presupuesto máximo ${presupuesto}`,
     solicitud_original: String(textoOriginal || '').trim()
   };
 }
@@ -595,9 +689,12 @@ Reglas:
 8. Las URLs deben coincidir exactamente con las URLs entregadas.
 9. Indica qué debe confirmarse en el sitio de cada proveedor.
 10. Si no hay tarifas claras, usa la mejor referencia disponible sin fabricar cifras.
-11. Si hay presupuesto, indica si cumple solo cuando existan valores suficientes.
-12. Incluye como máximo tres alternativas, y cada alternativa también debe incluir vuelo y alojamiento.
-13. No declares una opción como completa si falta alojamiento.
+11. Si existe presupuesto_total, es un límite máximo estricto e inquebrantable para vuelo y alojamiento juntos.
+12. Con presupuesto_total, calcula total_estimado como vuelo.precio + alojamiento.precio_total. El precio del vuelo debe corresponder al total para todos los pasajeros y el alojamiento al total de todas las noches.
+13. Con presupuesto_total, NO incluyas, recomiendes ni marques como alternativa ninguna opción cuyo total_estimado sea mayor al presupuesto. Tampoco incluyas opciones con total desconocido.
+14. Si ninguna combinación verificable cumple el presupuesto, devuelve mejor_opcion=null y alternativas=[]; no muestres una opción cercana que se pase del monto.
+15. Incluye como máximo tres alternativas, y cada alternativa también debe incluir vuelo y alojamiento.
+16. No declares una opción como completa si falta alojamiento.
 
 Formato:
 {
@@ -676,6 +773,58 @@ function asegurarOpcionesCompletas(datos, interpretacion, webData) {
   };
 }
 
+
+function normalizarCriteriosPresentacion(datos = {}, interpretacion = {}) {
+  const existentes = datos.criterios_interpretados || {};
+  const destino = String(
+    interpretacion.destino ||
+    existentes.destino ||
+    existentes.destino_o_zona ||
+    datos.destino_solicitado ||
+    datos.mejor_opcion?.destino_final ||
+    ''
+  ).trim();
+  const origen = String(
+    interpretacion.origen ||
+    existentes.origen ||
+    datos.mejor_opcion?.origen ||
+    ''
+  ).trim();
+
+  const viajerosNumero = Math.max(
+    1,
+    Number(interpretacion.adultos || 1) + Number(interpretacion.ninos || 0)
+  );
+  const presupuesto = numeroMonetario(interpretacion.presupuesto_total);
+  const moneda = interpretacion.moneda || existentes.moneda || 'CLP';
+
+  const supuestos = Array.isArray(existentes.supuestos_utilizados)
+    ? existentes.supuestos_utilizados
+    : (Array.isArray(interpretacion.supuestos) ? interpretacion.supuestos : []);
+
+  const supuestosLimpios = destino
+    ? supuestos.filter((s) => !/destino\s+flexible|destino\s+abierto/i.test(String(s || '')))
+    : supuestos;
+
+  return {
+    ...existentes,
+    origen,
+    destino,
+    destino_o_zona: destino,
+    fechas_o_flexibilidad: existentes.fechas_o_flexibilidad ||
+      (interpretacion.fecha_ida
+        ? `${interpretacion.fecha_ida}${interpretacion.fecha_vuelta ? ` a ${interpretacion.fecha_vuelta}` : ''}`
+        : 'Fechas flexibles'),
+    duracion: existentes.duracion || `${Math.max(1, Number(interpretacion.cantidad_noches || 3))} noches`,
+    viajeros: existentes.viajeros || `${viajerosNumero} persona(s)`,
+    presupuesto: existentes.presupuesto || (presupuesto ? `${Math.round(presupuesto)} ${moneda}` : 'No indicado'),
+    tipo_viaje: existentes.tipo_viaje || interpretacion.tipo_viaje || 'General',
+    prioridades: Array.isArray(existentes.prioridades) ? existentes.prioridades : (interpretacion.prioridades || []),
+    preferencias: Array.isArray(existentes.preferencias) ? existentes.preferencias : (interpretacion.preferencias || []),
+    supuestos_utilizados: supuestosLimpios
+  };
+}
+
 async function guardarResultado({ consulta, interpretacion, datos, fuentes }) {
   const connection = await pool.getConnection();
   try {
@@ -749,6 +898,35 @@ async function buscarEnWeb(filtros, textoOriginal = '') {
     interpretacion = interpretacionFallback(textoOriginal, filtros);
   }
 
+  const interpretacionBase = interpretacionFallback(textoOriginal, filtros);
+  const destinoExplicito = String(
+    filtros?.destino ||
+    interpretacionBase.destino ||
+    interpretacion?.destino ||
+    ''
+  ).trim();
+
+  const supuestosNormalizados = Array.isArray(interpretacion?.supuestos)
+    ? interpretacion.supuestos.filter((supuesto) => {
+        if (!destinoExplicito) return true;
+        return !/destino\s+flexible|destino\s+abierto/i.test(String(supuesto || ''));
+      })
+    : interpretacionBase.supuestos;
+
+  interpretacion = {
+    ...interpretacionBase,
+    ...(interpretacion || {}),
+    origen: String(filtros?.origen || interpretacion?.origen || interpretacionBase.origen || '').trim(),
+    destino: destinoExplicito,
+    // Un destino indicado por el usuario siempre tiene prioridad sobre una inferencia de destino abierto.
+    destino_abierto: destinoExplicito ? false : Boolean(interpretacion?.destino_abierto),
+    supuestos: supuestosNormalizados,
+    presupuesto_total: numeroMonetario(interpretacion?.presupuesto_total)
+      || numeroMonetario(filtros?.presupuesto_total)
+      || null,
+    moneda: interpretacion?.moneda || filtros?.moneda || 'CLP'
+  };
+
   const consultas = construirConsultasTavily(interpretacion, textoOriginal);
   const webData = await buscarCategoriasObligatorias(consultas);
 
@@ -768,6 +946,9 @@ async function buscarEnWeb(filtros, textoOriginal = '') {
   }
 
   analisis.datos = asegurarOpcionesCompletas(analisis.datos, interpretacion, webData);
+  analisis.datos = aplicarPresupuestoEstricto(analisis.datos, interpretacion);
+  analisis.datos.destino_solicitado = interpretacion.destino || analisis.datos.destino_solicitado || '';
+  analisis.datos.criterios_interpretados = normalizarCriteriosPresentacion(analisis.datos, interpretacion);
 
   const fuentes = webData.results.map((r) => ({
     titulo: r.title || dominioDe(r.url) || 'Fuente web',
@@ -804,5 +985,8 @@ module.exports = {
   interpretarSolicitudConOllama,
   buscarConTavily,
   construirConsultasTavily,
-  buscarCategoriasObligatorias
+  buscarCategoriasObligatorias,
+  numeroMonetario,
+  totalOpcion,
+  aplicarPresupuestoEstricto
 };

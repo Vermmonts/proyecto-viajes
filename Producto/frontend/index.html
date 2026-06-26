@@ -32,7 +32,8 @@
       <div class="user-pill hidden" id="userPill">
         <span class="user-avatar" aria-hidden="true">●</span>
         <span id="userName"></span>
-        <button class="btn btn-outline-light btn-small" id="logoutBtn">Salir</button>
+        <button class="btn btn-outline-light btn-small" id="profileBtn" type="button">Mi perfil</button>
+        <button class="btn btn-outline-light btn-small" id="logoutBtn" type="button">Salir</button>
       </div>
     </div>
   </header>
@@ -235,6 +236,49 @@
         <small class="field-message" data-error-for="registro-confirm-password"></small>
 
         <button class="btn btn-primary" type="submit">Crear cuenta</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="profileTitle">
+    <div class="modal-card modal-card-wide">
+      <button class="close" data-close aria-label="Cerrar">×</button>
+      <p class="section-label">Cuenta personal</p>
+      <h2 id="profileTitle">Editar mi perfil</h2>
+      <p class="muted">Actualiza tu nombre o cambia tu contraseña. El correo no se puede modificar desde esta sección.</p>
+      <form id="profileForm" class="auth-form" novalidate>
+        <label for="profileName">Nombre</label>
+        <input id="profileName" type="text" name="nombre" minlength="2" maxlength="100" required autocomplete="name" />
+        <small class="field-message" data-error-for="profile-name"></small>
+
+        <label for="profileEmail">Correo electrónico</label>
+        <input id="profileEmail" type="email" name="email" readonly aria-readonly="true" />
+
+        <div class="profile-password-section">
+          <h3>Cambiar contraseña</h3>
+          <p class="muted">Deja estos campos vacíos si solo quieres actualizar tu nombre.</p>
+        </div>
+
+        <label for="profileCurrentPassword">Contraseña actual</label>
+        <input id="profileCurrentPassword" type="password" name="currentPassword" maxlength="72" autocomplete="current-password" />
+        <small class="field-message" data-error-for="profile-current-password"></small>
+
+        <label for="profileNewPassword">Nueva contraseña</label>
+        <input id="profileNewPassword" type="password" name="newPassword" minlength="8" maxlength="72" autocomplete="new-password" aria-describedby="profilePasswordRules" />
+        <div class="password-rules" id="profilePasswordRules" aria-live="polite">
+          <span data-rule="length">8 caracteres como mínimo</span>
+          <span data-rule="lower">Una letra minúscula</span>
+          <span data-rule="upper">Una letra mayúscula</span>
+          <span data-rule="number">Un número</span>
+          <span data-rule="symbol">Un símbolo</span>
+        </div>
+        <small class="field-message" data-error-for="profile-new-password"></small>
+
+        <label for="profileConfirmPassword">Confirmar nueva contraseña</label>
+        <input id="profileConfirmPassword" type="password" name="confirmPassword" minlength="8" maxlength="72" autocomplete="new-password" />
+        <small class="field-message" data-error-for="profile-confirm-password"></small>
+
+        <button class="btn btn-primary" type="submit">Guardar cambios</button>
       </form>
     </div>
   </div>

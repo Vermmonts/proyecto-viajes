@@ -19,13 +19,16 @@ router.post('/', async (req, res) => {
     }
 
     const mejor = web.datos?.mejor_opcion || null;
+    const sinOpcionesPresupuesto = Boolean(web.datos?.sin_opciones_dentro_presupuesto);
     res.json({
       ok: true,
       origen_datos: 'web',
       base_consultada: false,
       filtros,
       interpretacion: web.interpretacion,
-      mensaje: mejor ? 'Se encontró la mejor opción disponible en internet.' : 'La búsqueda terminó, pero no fue posible estructurar una opción completa.',
+      mensaje: sinOpcionesPresupuesto
+        ? web.datos.mensaje_presupuesto
+        : (mejor ? 'Se encontró la mejor opción disponible dentro de las condiciones indicadas.' : 'La búsqueda terminó, pero no fue posible estructurar una opción completa.'),
       ia: { usada: true, proveedor: web.proveedor, modelo: web.modelo },
       mejor_opcion: mejor,
       alternativas: web.datos?.alternativas || [],

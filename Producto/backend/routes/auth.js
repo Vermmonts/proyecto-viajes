@@ -244,8 +244,107 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.get('/perfil', authRequired, (req, res) => {
-  res.json({ ok: true, user: req.user, usuario: req.user });
+router.get('/perfil', authRequired, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, nombre, email, fecha_creacion FROM usuarios WHERE id = ? LIMIT 1',
+      [req.user.id]
+    );
+    if (!rows.length) return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+    const user = rows[0];
+    return res.json({ ok: true, user, usuario: user });
+  } catch (error) {
+    console.error('ERROR CARGAR PERFIL:', error);
+    return res.status(500).json({ ok: false, message: 'No se pudo cargar el perfil.' });
+  }
+});
+
+router.put(['/perfil', '/profile'], authRequired, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM usuarios WHERE id = ? LIMIT 1', [req.user.id]);
+    const actual = rows[0];
+    if (!actual) return res.status(404).json({ ok: false, message: 'Usuario no encontrado.' });
+
+    const nombre = req.body.nombre === undefined ? normalizeName(actual.nombre) : normalizeName(req.body.nombre);
+    const currentPassword = String(req.body.currentPassword || req.body.passwordActual || '');
+    const newPassword = String(req.body.newPassword || req.body.nuevaPassword || '');
+    const confirmPassword = String(req.body.confirmPassword || req.body.confirmarPassword || '');
+    const cambiarPassword = Boolean(currentPassword || newPassword || confirmPassword);
+    const errors = {};
+
+    const nameError = validateName(nombre);
+    if (nameError) errors.nombre = nameError;
+
+    if (cambiarPassword) {
+      if (!currentPassword) errors.currentPassword = 'Ingresa tu contraseña actual.';
+      if (!newPassword) errors.newPassword = 'Ingresa la nueva contraseña.';
+      else {
+        const passwordError = validatePassword(newPassword, { nombre, email: actual.email });
+        if (passwordError) errors.newPassword = passwordError;
+      }
+      if (!confirmPassword) errors.confirmPassword = 'Confirma la nueva contraseña.';
+      else if (newPassword !== confirmPassword) errors.confirmPassword = 'Las contraseñas no coinciden.';
+      if (newPassword && currentPassword && newPassword === currentPassword) {
+        errors.newPassword = 'La nueva contraseña debe ser distinta de la actual.';
+      }
+    }
+
+    if (Object.keys(errors).length) {
+      return res.status(400).json({ ok: false, message: 'Revisa los datos del perfil.', errors });
+    }
+
+    let nuevoHash = null;
+    if (cambiarPassword) {
+      const hashActual = actual.password_hash || actual.password;
+      let passwordValida = false;
+      if (hashActual && String(hashActual).startsWith('$2')) {
+        passwordValida = await bcrypt.compare(currentPassword, hashActual);
+      } else if (actual.password) {
+        passwordValida = currentPassword === actual.password;
+      }
+
+      if (!passwordValida) {
+        return res.status(401).json({
+          ok: false,
+          message: 'La contraseña actual no es correcta.',
+          errors: { currentPassword: 'La contraseña actual no es correcta.' }
+        });
+      }
+      nuevoHash = await bcrypt.hash(newPassword, 12);
+    }
+
+    const columns = await getUserColumns();
+    const updates = ['nombre = ?'];
+    const values = [nombre];
+
+    if (nuevoHash) {
+      if (columns.has('password_hash')) {
+        updates.push('password_hash = ?');
+        values.push(nuevoHash);
+      }
+      if (columns.has('password')) {
+        updates.push('password = ?');
+        values.push(nuevoHash);
+      }
+    }
+
+    values.push(actual.id);
+    await pool.query(`UPDATE usuarios SET ${updates.join(', ')} WHERE id = ?`, values);
+
+    const user = { id: actual.id, nombre, email: normalizeEmail(actual.email) };
+    return res.json({
+      ok: true,
+      user,
+      usuario: user,
+      token: signUser(user),
+      message: cambiarPassword
+        ? 'Perfil y contraseña actualizados correctamente.'
+        : 'Perfil actualizado correctamente.'
+    });
+  } catch (error) {
+    console.error('ERROR ACTUALIZAR PERFIL:', error);
+    return res.status(500).json({ ok: false, message: 'No se pudo actualizar el perfil.' });
+  }
 });
 
 module.exports = router;
